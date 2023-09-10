@@ -1,0 +1,52 @@
+(Py.Grammar.block
+ [(Py.Grammar.stmt
+   (Py.Grammar.simpleStmts
+    [(Py.Grammar.assignment
+      (group
+       [(group (Py.Grammar.starTargets [(Py.Grammar.pyStarTarget__1 (Py.Grammar.name `x))]) "=")]
+       (Py.Grammar.annotatedRhs
+        (Py.Grammar.starExprs
+         [(Py.Grammar.starExpr
+           (Py.Grammar.callExpr
+            (Py.Grammar.identExpr `f)
+            "("
+            [(Py.Grammar.arguments (Py.Grammar.args (group [(group (group (Py.Grammar.numExpr (num "1"))))] [])))]
+            ")"))]))
+       []))
+     ";"
+     (Py.Grammar.starExprs
+      [(Py.Grammar.starExpr
+        (Py.Grammar.add
+         (Py.Grammar.numExpr (num "4"))
+         "+"
+         (Py.Grammar.callExpr
+          (Py.Grammar.identExpr `f)
+          "("
+          [(Py.Grammar.arguments (Py.Grammar.args (group [(group (group (Py.Grammar.numExpr (num "3"))))] [])))]
+          ")")))])]))
+  (Py.Grammar.stmt
+   (Py.Grammar.ifStmt
+    "if"
+    (Py.Grammar.namedExpr (group (Py.Grammar.is (Py.Grammar.identExpr `a) "is" (Py.Grammar.noneExpr "None"))))
+    ":"
+    (Py.Grammar.block
+     [(Py.Grammar.stmt
+       (Py.Grammar.simpleStmts
+        [(Py.Grammar.starExprs
+          [(Py.Grammar.starExpr
+            (Py.Grammar.callExpr
+             (Py.Grammar.identExpr `kill)
+             "("
+             [(Py.Grammar.arguments (Py.Grammar.args (group [(group (group (Py.Grammar.identExpr `pid)))] [])))]
+             ")"))])]))
+      (Py.Grammar.stmt
+       (Py.Grammar.simpleStmts
+        [(Py.Grammar.returnStmt "return" [(Py.Grammar.starExpr (Py.Grammar.trueExpr "True"))])]))])
+    []
+    [(Py.Grammar.elseBlock
+      "else"
+      ":"
+      (Py.Grammar.block
+       [(Py.Grammar.stmt
+         (Py.Grammar.simpleStmts
+          [(Py.Grammar.returnStmt "return" [(Py.Grammar.starExpr (Py.Grammar.falseExpr "False"))])]))]))]))])
