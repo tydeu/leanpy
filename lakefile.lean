@@ -5,14 +5,7 @@ open System Lake DSL
 package leanpy
 
 @[default_target]
-lean_lib Py
-
-@[default_target]
 lean_lib LeanPy
-
-@[default_target]
-lean_exe leanpy where
-  root := `Main
 
 @[test_driver]
 script test do
