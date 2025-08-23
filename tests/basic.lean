@@ -1,6 +1,6 @@
-import Py
+import LeanPy
 
-syntax (name := pyCmd) withPosition("#py" Py.Grammar.block) : command
+syntax (name := pyCmd) withPosition("#py" LeanPy.Grammar.block) : command
 macro_rules
 | `(pyCmd|#py $blk) => `(#eval IO.println $(Lean.quote <| toString blk))
 

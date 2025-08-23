@@ -10,12 +10,12 @@ import LeanPy.Parser
 
 This module contains a Lean DSL that encodes the Python grammar.
 It uses Python 3's [Full Grammar Specification][1] as a guideline.
+It targets version 3.11.
 
-[1]: https://docs.python.org/3/reference/grammar.html
+[1]: https://docs.python.org/3.11/reference/grammar.html
 -/
 
-namespace Py.Grammar
-open LeanPy
+namespace LeanPy.Grammar
 
 /-- Use `[stx]` as an alternative to `(stx)?` following the specification style. -/
 local macro "[" xs:stx* "]" : stx => `(stx|($[$xs:stx]*)?)
@@ -140,7 +140,7 @@ syntax:max (name := ellipsis)   "..." : pyExpr
 NOTE FROM THE SPECIFICATION:
 `lambdaParams` etc. duplicates parameters but without annotations
 or type comments, and if there's no comma after a parameter, we expect
-a colon, not a close parenthesis.  (For more, see parameters above.)
+a colon, not a close parenthesis. (For more, see parameters above.)
 -/
 
 syntax default := " = " pyExpr
@@ -266,7 +266,7 @@ syntax:max "[" pyDelTarget,*,? "]" : pyDelTarget
 
 /-! ## Typing Elements -/
 
--- NOTE FROM THE SPECIFICATION:  `typeExprs` allow `*`/`**` but ignore them
+-- NOTE FROM THE SPECIFICATION: `typeExprs` allow `*`/`**` but ignore them
 syntax typeExprs
   | "**" pyExpr
   | "*" pyExpr ["," "**" pyExpr]

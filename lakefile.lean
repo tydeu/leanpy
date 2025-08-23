@@ -5,28 +5,27 @@ open System Lake DSL
 package leanpy
 
 @[default_target]
-lean_lib Py
-
-@[default_target]
 lean_lib LeanPy
-
-@[default_target]
-lean_exe leanpy where
-  root := `Main
 
 @[test_driver]
 script test do
   let testFile : FilePath := "tests" / "basic.lean"
   let eOutFile := testFile.withExtension "expected.out"
-  let eOut ← (·.crlfToLf) <$> IO.FS.readFile eOutFile
+  let eOut ← IO.FS.readFile eOutFile
   let out ← IO.Process.output {
     cmd := (← getLean).toString
     args := #[testFile.toString]
     env := ← getAugmentedEnv
   }
-  let pOut := out.stderr ++ out.stdout |>.crlfToLf
+  let pOut := out.stderr ++ out.stdout
   let pOutFile := testFile.withExtension "produced.out"
   IO.FS.writeFile pOutFile pOut
+  if out.exitCode != 0 then
+    IO.eprintln s!"{testFile}: Lean exited with code {out.exitCode}"
+    IO.eprintln pOut
+    return 1
+  let pOut := pOut.crlfToLf
+  let eOut := eOut.crlfToLf
   if eOut = pOut then
     IO.eprintln s!"{testFile}: output matched"
     return 0
