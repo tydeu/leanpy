@@ -46,4 +46,4 @@ jobs:
         name: ${{ matrix.os }}
         path: build
     - name: Test
-      run: lake run test
+      run: lake test

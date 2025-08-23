@@ -41,7 +41,7 @@ syntax (name := syntaxAbbrevAlts) (docComment)?
 
 macro_rules
 | `(syntaxAbbrevAlts| $(doc?)? syntax $id $[| $[$alts:stx]*]*) => do
-  let alt0 := ⟨mkNullNode alts.back⟩
+  let alt0 := ⟨mkNullNode alts.back!⟩
   let stx ← alts[0:alts.size-1].foldrM (init := alt0) fun xs x =>
     `(stx|($[$xs]*) <|> $x)
   `(syntaxAbbrev| $[$doc?:docComment]? syntax $id := $stx)
