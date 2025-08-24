@@ -11,15 +11,21 @@ lean_lib LeanPy
 script test do
   let testFile : FilePath := "tests" / "basic.lean"
   let eOutFile := testFile.withExtension "expected.out"
-  let eOut ← (·.crlfToLf) <$> IO.FS.readFile eOutFile
+  let eOut ← IO.FS.readFile eOutFile
   let out ← IO.Process.output {
     cmd := (← getLean).toString
     args := #[testFile.toString]
     env := ← getAugmentedEnv
   }
-  let pOut := out.stderr ++ out.stdout |>.crlfToLf
+  let pOut := out.stderr ++ out.stdout
   let pOutFile := testFile.withExtension "produced.out"
   IO.FS.writeFile pOutFile pOut
+  if out.exitCode != 0 then
+    IO.eprintln s!"{testFile}: Lean exited with code {out.exitCode}"
+    IO.eprintln pOut
+    return 1
+  let pOut := pOut.crlfToLf
+  let eOut := eOut.crlfToLf
   if eOut = pOut then
     IO.eprintln s!"{testFile}: output matched"
     return 0
