@@ -2,7 +2,8 @@ import Lake
 import Lean.Util.Diff
 open System Lake DSL
 
-package leanpy
+package leanpy where
+  reservoir := false
 
 @[default_target]
 lean_lib LeanPy
