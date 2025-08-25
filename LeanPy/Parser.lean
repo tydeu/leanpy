@@ -10,8 +10,9 @@ import Lean.Parser.Syntax
 Additional definitions to help with defining the Python grammar.
 -/
 
-namespace LeanPy
 open Lean Parser Command PrettyPrinter Formatter Parenthesizer
+
+namespace LeanPy
 
 /--
 `$`-style application grouping for the syntax category.
@@ -104,3 +105,13 @@ That is, it parses an identifier without a `.` (an unqualified/atomic identifier
 -/
 @[run_parser_attribute_hooks] def simpleIdent : Parser :=
   withAntiquot (mkAntiquot "ident" identKind) simpleIdentNoAntiquot
+
+def skipInsideQuotFn (p : ParserFn) : ParserFn := fun c s =>
+  if c.quotDepth > 0 then s else p c s
+
+@[run_parser_attribute_hooks]
+def skipInsideQuot (p : Parser) : Parser :=
+  withFn skipInsideQuotFn p
+
+initialize
+  register_parser_alias skipInsideQuot { stackSz? := none }

@@ -279,7 +279,9 @@ syntax funcTypeComment
 /-! ## Statements -/
 
 declare_syntax_cat pySimpleStmt (behavior := symbol)
-syntax simpleStmts := withPosition(sepBy1(pySimpleStmt, "; ")) linebreak
+syntax simpleStmts :=
+  withPosition(sepBy1(lineEq pySimpleStmt, ";", ";", allowTrailingSep))
+  skipInsideQuot(linebreak)
 
 declare_syntax_cat pyCompoundStmt (behavior := symbol)
 syntax stmt := pyCompoundStmt <|> simpleStmts

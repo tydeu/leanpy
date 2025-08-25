@@ -8,9 +8,21 @@ package leanpy where
 @[default_target]
 lean_lib LeanPy
 
-@[test_driver]
-script test do
-  let testFile : FilePath := "tests" / "basic.lean"
+def testLeanFile (testFile : FilePath) : ScriptM UInt32 := do
+  let child ← IO.Process.spawn {
+    cmd := (← getLean).toString
+    args := #[testFile.toString]
+    env := ← getAugmentedEnv
+  }
+  let rc ← child.wait
+  if rc == 0 then
+    IO.eprintln s!"{testFile}: completed successfully"
+    return 0
+  else
+    IO.eprintln s!"{testFile}: Lean exited with code {rc}"
+    return 1
+
+def testLeanOutput (testFile : FilePath) : ScriptM UInt32 := do
   let eOutFile := testFile.withExtension "expected.out"
   let eOut ← IO.FS.readFile eOutFile
   let out ← IO.Process.output {
@@ -37,3 +49,12 @@ script test do
     let diffs := Lean.Diff.diff eLns pLns
     IO.eprintln <| Lean.Diff.linesToString diffs
     return 1
+
+@[test_driver]
+script test do
+  runBuild (← LeanPy.get).leanArts.fetch
+  if (← testLeanOutput ("tests" / "basic.lean")) != 0 then
+    return 1
+  if (← testLeanFile ("tests" / "eval.lean")) != 0 then
+    return 1
+  return 0
