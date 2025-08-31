@@ -3,13 +3,15 @@ Copyright (c) 2024 Mac Malone. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
-import LeanPy.Object
 import LeanPy.Grammar
-import LeanPy.ElabUtil
+import LeanPy.Data.Object.Basic
+import LeanPy.Util.Elab
 
 open Lean Elab Command Parser
 
 namespace LeanPy
+
+/-! ## Monad -/
 
 abbrev PyElabM := CoreM
 abbrev PyEvalM := PyElabM
@@ -21,6 +23,8 @@ def PyElabM.liftPyM (x : PyM α) : PyElabM α := do
   | .error e => throwError "python error of type '{e.ty.name}'"
 
 instance : MonadLift PyM PyElabM := ⟨PyElabM.liftPyM⟩
+
+/-! ## Elaborator -/
 
 initialize pyEvalAttribute : KeyedDeclsAttribute PyEval ←
   unsafe mkElabAttribute _ `builtin_py_eval `py_eval `LeanPy.Grammar ``PyEval "py"
@@ -37,3 +41,18 @@ def evalPy (stx : Syntax) : PyEvalM Object :=
 
 def runPy (stx : Syntax) : PyElabM Unit :=
   withLogging <| discard <| evalPy stx
+
+/-! ## Command -/
+
+open Grammar
+
+scoped syntax (name := evalPyCmd) withPosition("#eval_py" block) : command
+
+@[command_elab evalPyCmd]
+def elabEvalPyCmd : CommandElab := fun stx => do
+  let `(#eval_py%$tk $b) := stx
+    | throwError "ill-formed `#eval_py` syntax"
+  liftCoreM <| withRef tk do
+  let v ← evalPy b
+  unless v.isNone do
+    logInfo (← v.repr)

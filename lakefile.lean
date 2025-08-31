@@ -53,7 +53,7 @@ def testLeanOutput (testFile : FilePath) : ScriptM UInt32 := do
 @[test_driver]
 script test do
   runBuild (← LeanPy.get).leanArts.fetch
-  if (← testLeanOutput ("tests" / "basic.lean")) != 0 then
+  if (← testLeanOutput ("tests" / "syntax.lean")) != 0 then
     return 1
   if (← testLeanFile ("tests" / "eval.lean")) != 0 then
     return 1
