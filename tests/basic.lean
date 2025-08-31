@@ -1,10 +1,12 @@
 import LeanPy
 
-syntax (name := pyCmd) withPosition("#py" LeanPy.Grammar.block) : command
-macro_rules
-| `(pyCmd|#py $blk) => `(#eval IO.println $(Lean.quote <| toString blk))
+syntax withPosition("#print_py" LeanPy.Grammar.block) : command
 
-#py
+macro_rules
+| `(#print_py $blk) =>
+  `(#eval IO.println $(Lean.quote <| toString blk))
+
+#print_py
   x = f(1); 4 + f(3)
   if a is None:
     kill(pid)

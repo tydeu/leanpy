@@ -15,6 +15,13 @@ abbrev PyElabM := CoreM
 abbrev PyEvalM := PyElabM
 abbrev PyEval := Syntax → PyEvalM Object
 
+def PyElabM.liftPyM (x : PyM α) : PyElabM α := do
+  match (← x.toBaseIO) with
+  | .ok a => return a
+  | .error e => throwError "python error of type '{e.ty.name}'"
+
+instance : MonadLift PyM PyElabM := ⟨PyElabM.liftPyM⟩
+
 initialize pyEvalAttribute : KeyedDeclsAttribute PyEval ←
   unsafe mkElabAttribute _ `builtin_py_eval `py_eval `LeanPy.Grammar ``PyEval "py"
 

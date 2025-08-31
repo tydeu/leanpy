@@ -80,7 +80,7 @@ def commaBefore := checkAtomTop (· = ",") "expected ',' before"
 def simpleIdentFn : ParserFn := fun ctx st =>
   let startPos := st.pos
   let initStackSz := st.stackSize
-  let expected := ["expected simple unqualified identifier"]
+  let expected := ["simple unqualified identifier"]
   let st := tokenFn expected ctx st
   if st.hasError then
     st

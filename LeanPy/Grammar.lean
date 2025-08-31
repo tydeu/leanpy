@@ -58,7 +58,7 @@ syntax starNamedExpr
 
 /-! ### Logical Expressions -/
 
-syntax (name := condExpr) pyExpr:30 colGt " if " pyExpr:30 colGt " else " pyExpr : pyExpr
+syntax:10 (name := condExpr) pyExpr:30 colGt " if " pyExpr:30 colGt " else " pyExpr : pyExpr
 syntax:30 (name := disjunction) pyExpr:31 (" or " pyExpr:31)+ : pyExpr
 syntax:35 (name := conjunction) pyExpr:36 (" and " pyExpr:36)+ : pyExpr
 syntax:38 (name := inversion) "not " pyExpr:40 : pyExpr
@@ -125,13 +125,13 @@ syntax:arg pyExpr:arg "[" slices "]" : pyExpr
 /- Captures both simple names and member accesses of names. -/
 syntax:max (name := identExpr) ident : pyExpr
 
-syntax:arg pyExpr:arg "." name : pyExpr
+syntax:arg pyExpr:arg "." ident : pyExpr
 
 syntax:max (name := trueExpr)   "True" : pyExpr
 syntax:max (name := falseExpr)  "False" : pyExpr
 syntax:max (name := noneExpr)   "None" : pyExpr
 syntax:max (name := numExpr)    num : pyExpr
-syntax:max (name := group)      "(" (yieldExpr <|> namedExpr) ")" : pyExpr
+syntax:max (name := groupExpr)  "(" (yieldExpr <|> namedExpr) ")" : pyExpr
 syntax:max (name := ellipsis)   "..." : pyExpr
 
 /-! ### Lambda Functions -/
@@ -376,7 +376,7 @@ attribute [pySimpleStmt_parser] importFrom
 /-! ### Compound Statements -/
 
 syntax block
-  | ppSpace ("\\" <|> lineEq) simpleStmts
+  | ppSpace lineEq ("\\" lineEq)* simpleStmts
   | ppIndent(colGt withPosition(many1Indent(ppLine stmt)))
 
 syntax decorator := "@" namedExpr linebreak
@@ -458,14 +458,17 @@ syntax elseBlock := "else" ":" block
 syntax elifStmt := "elif " namedExpr ":" block
 
 syntax ifStmt := withPosition $
-  "if " namedExpr ":" block (colEq elifStmt)* [colEq elseBlock]
+  "if " namedExpr ":" block
+  (skipInsideQuot(colEq) elifStmt)*
+  [skipInsideQuot(colEq) elseBlock]
 
 attribute [pyCompoundStmt_parser] ifStmt
 
 /-! ### While Statement -/
 
 syntax whileStmt := withPosition $
-  "while" namedExpr ":" block [colEq elseBlock]
+  "while" namedExpr ":" block
+  [skipInsideQuot(colEq) elseBlock]
 
 attribute [pyCompoundStmt_parser] whileStmt
 
@@ -473,7 +476,8 @@ attribute [pyCompoundStmt_parser] whileStmt
 
 syntax forStmt := withPosition $
   atomic("async "? "for" starTargets "in")
-  starExprs ":" [typeComment] block [colEq elseBlock]
+  starExprs ":" [typeComment] block
+  [skipInsideQuot(colEq) elseBlock]
 
 attribute [pyCompoundStmt_parser] forStmt
 
@@ -486,8 +490,8 @@ syntax withSig
   | "(" withItem,+,? ")" ":" block
   | withItem,+ ":" [typeComment] block
 
-syntax withStmt :=
-  withPosition("async "? "with " withSig)
+syntax withStmt := withPosition $
+  "async "? "with " withSig
 
 attribute [pyCompoundStmt_parser] withStmt
 
