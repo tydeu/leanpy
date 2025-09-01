@@ -32,7 +32,7 @@ syntax lambdaParam := name
 
 declare_syntax_cat pyExpr (behavior := symbol)
 
-syntax typeComment := "# " "type: " pyExpr
+syntax typeComment := "# " &"type: " pyExpr
 
 syntax exprs := pyExpr,+,?
 syntax starredExpr := "*" pyExpr

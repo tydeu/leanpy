@@ -8,11 +8,19 @@ package leanpy where
 @[default_target]
 lean_lib LeanPy
 
+@[default_target]
+lean_exe leanpy where
+  root := `Main
+  -- Linking `libleanshared` on Windows (as with `supportInterpreter`)
+  -- is not necessary necessary due to builtins, so avoid it
+  moreLinkArgs := if !System.Platform.isWindows then #["-rdynamic"] else #[]
+
 def testLeanFile (testFile : FilePath) : ScriptM UInt32 := do
   let child ← IO.Process.spawn {
     cmd := (← getLean).toString
     args := #[testFile.toString]
     env := ← getAugmentedEnv
+    inheritEnv := false
   }
   let rc ← child.wait
   if rc == 0 then
@@ -29,6 +37,7 @@ def testLeanOutput (testFile : FilePath) : ScriptM UInt32 := do
     cmd := (← getLean).toString
     args := #[testFile.toString]
     env := ← getAugmentedEnv
+    inheritEnv := false
   }
   let pOut := out.stderr ++ out.stdout
   let pOutFile := testFile.withExtension "produced.out"
@@ -50,11 +59,27 @@ def testLeanOutput (testFile : FilePath) : ScriptM UInt32 := do
     IO.eprintln <| Lean.Diff.linesToString diffs
     return 1
 
+def testLeanPyFile (leanpy : FilePath) (testFile : FilePath) : ScriptM UInt32 := do
+  let child ← IO.Process.spawn {
+    cmd := leanpy.toString
+    args := #[testFile.toString]
+    inheritEnv := false
+  }
+  let rc ← child.wait
+  if rc == 0 then
+    IO.eprintln s!"{testFile}: completed successfully"
+    return 0
+  else
+    IO.eprintln s!"{testFile}: leanpy exited with code {rc}"
+    return 1
+
 @[test_driver]
 script test do
-  runBuild (← LeanPy.get).leanArts.fetch
+  let leanpy ← runBuild leanpy.fetch
   if (← testLeanOutput ("tests" / "syntax.lean")) != 0 then
     return 1
   if (← testLeanFile ("tests" / "eval.lean")) != 0 then
+    return 1
+  if (← testLeanPyFile leanpy ("tests" / "example.py")) != 0 then
     return 1
   return 0
