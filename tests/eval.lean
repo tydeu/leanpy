@@ -60,3 +60,38 @@ open LeanPy
     True
   else:
     False
+
+/-! ## Variables -/
+
+/-- error: name 'x' is not defined -/
+#guard_msgs in #eval_py x
+
+/-- info: True -/
+#guard_msgs in
+#eval_py
+  x = True
+  x
+
+/-- info: True -/
+#guard_msgs in
+#eval_py
+  x = False
+  if True:
+    x = True
+  x
+
+/-- info: True -/
+#guard_msgs in
+#eval_py
+  x = True
+  if False:
+    x = False
+  x
+
+/-- info: True -/
+#guard_msgs in
+#eval_py
+  x = False
+  if x := True:
+    pass
+  x

@@ -4,6 +4,8 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
 import Std.Data.HashMap
+import LeanPy.Data.HashDict
+import LeanPy.Data.AttrName
 
 namespace LeanPy
 
@@ -87,13 +89,23 @@ structure Object where
     ty : TypeObject leanTy
     /-- The object's Lean data. -/
     rawData : ObjectData leanTy
+    deriving Nonempty
+
+abbrev AttrDict := HashDict AttrName Object
 
 /-- A Python exception. -/
 -- TODO: Derive from `BaseException`
 abbrev ErrorObject := Object
 
+/-- Mutable dictionary of variables. -/
+abbrev VarDict := IO.Ref AttrDict
+
+structure PyContext where
+  globals : VarDict
+  locals : VarDict := globals
+
 /-- The monad of Python code. -/
-abbrev PyM := EIO ErrorObject
+abbrev PyM := ReaderT PyContext <| EIO ErrorObject
 
 def Object.mk [TypeName α] (ty : DTypeObject α) (data : α) : Object :=
   ⟨typeName α, ty, ObjectData.mk' data rfl⟩
@@ -106,6 +118,13 @@ instance [TypeName α] : CoeOut (DObject α) Object :=
 
 def DObject.data [Nonempty α] [TypeName α] (self : DObject α) : α :=
   self.rawData.get' self.toObject_leanTy_eq_typeName.symm
+
+protected def Object.toString (self : Object) : String :=
+  s!"<{self.ty.name} object>" -- TODO: at {addr}
+
+instance : ToString Object := ⟨Object.toString⟩
+
+/-! ## Slots -/
 
 set_option linter.unusedVariables.funArgs false in
 @[inline] def BoolSlot.mk' [TypeName α] (fn : DObject α → PyM Bool) (h : typeName α = n) : BoolSlot n :=
@@ -131,15 +150,7 @@ def Object.repr (self : Object) : PyM String :=
 def Object.toStr (self : Object) : PyM String :=
   self.ty.str.call self rfl
 
-def Object.toBool (self : Object) : PyM Bool :=
-  self.ty.bool.call self rfl
-
-protected def Object.toString (self : Object) : String :=
-  s!"<{self.ty.name} object>" -- TODO: at {addr}
-
-instance : ToString Object := ⟨Object.toString⟩
-
-/-! ## Simple Objects -/
+/-! ## None -/
 
 deriving instance TypeName for Unit
 
@@ -155,6 +166,8 @@ instance : CoeDep (Option α) none Object := ⟨.none⟩
 
 def Object.isNone (self : Object) : Bool :=
   self.ty.name == noneType.name
+
+/-! ## Boolean Objects -/
 
 deriving instance TypeName for Bool, Int
 
@@ -179,3 +192,6 @@ protected def Object.true : Object :=
   .mk boolType true
 
 instance : CoeDep Bool true Object := ⟨Object.true⟩
+
+def Object.toBool (self : Object) : PyM Bool :=
+  self.ty.bool.call self rfl

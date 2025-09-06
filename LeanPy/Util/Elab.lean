@@ -93,3 +93,7 @@ where
 instance : MonadBacktrack Core.State CoreM where
   saveState := get
   restoreState := set
+
+instance (priority := low) [MonadLift m n] [MonadBacktrack σ m] : MonadBacktrack σ n where
+  saveState := liftM (m := m) saveState
+  restoreState s := liftM (m := m) (restoreState s)

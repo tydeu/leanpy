@@ -317,7 +317,7 @@ attribute [pySimpleStmt_parser] nonlocalStmt
 
 /-! ### Assignment Statements -/
 
-syntax augassign
+syntax augAssign
   | "+="
   | "-="
   | "*="
@@ -343,7 +343,7 @@ syntax assignment
   | atomic(("(" pySingleTarget ")" <|> singleSubscriptAttributeTarget) ": ")
       pyExpr ["=" annotatedRhs]
   | (atomic(starTargets) "=")+ annotatedRhs !"=" [typeComment]
-  | atomic(pySingleTarget augassign) annotatedRhs
+  | atomic(pySingleTarget augAssign) annotatedRhs
 
 /-
 NOTE: Assignment MUST be higher priority than expression in the grammar,

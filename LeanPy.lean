@@ -7,5 +7,6 @@ import LeanPy.Data.Object.Basic
 import LeanPy.Elab.Basic
 import LeanPy.Elab.Command
 import LeanPy.Elab.Control
+import LeanPy.Elab.Var
 import LeanPy.ParserCategories
 import LeanPy.Grammar

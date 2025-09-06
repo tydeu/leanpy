@@ -13,14 +13,24 @@ namespace LeanPy
 
 /-! ## Monad -/
 
-abbrev PyElabM := CoreM
+abbrev PyElabM := ReaderT PyContext CoreM
 abbrev PyEvalM := PyElabM
 abbrev PyEval := Syntax → PyEvalM Object
 
-def PyElabM.liftPyM (x : PyM α) : PyElabM α := do
-  match (← x.toBaseIO) with
+def PyElabM.liftPyM (x : PyM α) : PyElabM α := fun ctx => do
+  match (← x.run ctx |>.toBaseIO) with
   | .ok a => return a
-  | .error e => throwError "python error of type '{e.ty.name}'"
+  | .error e => -- TODO: Traceback
+    let msg ← id do
+      match (← e.toStr.run ctx |>.toBaseIO) with
+      | .ok msg =>
+        if msg.isEmpty then
+          return e.ty.name
+        else
+          return s!"{e.ty.name}: {msg}"
+      | .error _ =>
+        return s!"{e.ty.name}: <exception str() failed>"
+    throwError msg
 
 instance : MonadLift PyM PyElabM := ⟨PyElabM.liftPyM⟩
 
@@ -52,7 +62,11 @@ scoped syntax (name := evalPyCmd) withPosition("#eval_py" block) : command
 def elabEvalPyCmd : CommandElab := fun stx => do
   let `(#eval_py%$tk $b) := stx
     | throwError "ill-formed `#eval_py` syntax"
-  liftCoreM <| withRef tk do
-  let v ← evalPy b
-  unless v.isNone do
-    logInfo (← v.repr)
+  let go : PyElabM Unit := do
+    withRef tk do
+    let v ← evalPy b
+    unless v.isNone do
+      logInfo (← v.repr)
+  let globals ← IO.mkRef {}
+  let ctx : PyContext := {globals}
+  liftCoreM <| ReaderT.run (r := ctx) go
