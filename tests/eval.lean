@@ -28,6 +28,18 @@ open LeanPy
   pass
   None
 
+/-- info: False -/
+#guard_msgs in #eval_py None is False
+
+/-- info: True -/
+#guard_msgs in #eval_py False is not True
+
+/-- info: False -/
+#guard_msgs in #eval_py False is not False
+
+/-- info: True -/
+#guard_msgs in #eval_py None is None
+
 /-! ## Conditionals -/
 
 /-- info: True -/

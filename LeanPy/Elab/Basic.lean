@@ -107,3 +107,19 @@ def evalPassStmt : PyEval := fun _ => do
 @[py_eval noneExpr]
 def evalNoneExpr : PyEval := fun _ => do
   return none
+
+@[py_eval isExpr]
+def evalIsExpr : PyEval := fun stx => do
+  let `(pyExpr| $a is $b) := stx
+    | throwError "ill-formed 'is' expression"
+  let a ← evalPy a
+  let b ← evalPy b
+  return a.id == b.id
+
+@[py_eval isNotExpr]
+def evalIsNotExpr : PyEval := fun stx => do
+  let `(pyExpr| $a is not $b) := stx
+    | throwError "ill-formed 'is not' expression"
+  let a ← evalPy a
+  let b ← evalPy b
+  return a.id != b.id

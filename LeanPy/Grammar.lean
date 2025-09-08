@@ -65,22 +65,22 @@ syntax:38 (name := inversion) "not " pyExpr:40 : pyExpr
 
 /-! ### Comparison Operators -/
 
-syntax:50 (name := eq)    pyExpr:50 " == " pyExpr:51 : pyExpr
-syntax:50 (name := ne)    pyExpr:50 " != " pyExpr:51 : pyExpr
-syntax:50 (name := le)    pyExpr:50 " <= " pyExpr:51 : pyExpr
-syntax:50 (name := lt)    pyExpr:50 " < " pyExpr:51 : pyExpr
-syntax:50 (name := ge)    pyExpr:50 " >= " pyExpr:51 : pyExpr
-syntax:50 (name := gt)    pyExpr:50 " > " pyExpr:51 : pyExpr
-syntax:50 (name := notIn) pyExpr:50 " not " "in " pyExpr:51 : pyExpr
-syntax:50 (name := «in»)  pyExpr:50 " in " pyExpr:51 : pyExpr
-syntax:50 (name := isNot) pyExpr:50 " is " "not " pyExpr:51 : pyExpr
-syntax:50 (name := «is»)  pyExpr:50 " is " pyExpr:51 : pyExpr
+syntax:50 (name := eq)          pyExpr:50 " == " pyExpr:51 : pyExpr
+syntax:50 (name := ne)          pyExpr:50 " != " pyExpr:51 : pyExpr
+syntax:50 (name := le)          pyExpr:50 " <= " pyExpr:51 : pyExpr
+syntax:50 (name := lt)          pyExpr:50 " < " pyExpr:51 : pyExpr
+syntax:50 (name := ge)          pyExpr:50 " >= " pyExpr:51 : pyExpr
+syntax:50 (name := gt)          pyExpr:50 " > " pyExpr:51 : pyExpr
+syntax:50 (name := notInExpr)   pyExpr:50 " not " "in " pyExpr:51 : pyExpr
+syntax:50 (name := inExpr)      pyExpr:50 " in " pyExpr:51 : pyExpr
+syntax:50 (name := isNotExpr)   pyExpr:50 " is " "not " pyExpr:51 : pyExpr
+syntax:50 (name := isExpr)      pyExpr:50 " is " pyExpr:51 : pyExpr
 
 /-! ### Bitwise Operators -/
 
-syntax:55 (name := bitwiseOr)  pyExpr:55 " | " pyExpr:56 : pyExpr
-syntax:58 (name := bitwiseXor) pyExpr:58 " ^ " pyExpr:59 : pyExpr
-syntax:60 (name := bitwiseAnd) pyExpr:60 " & " pyExpr:61 : pyExpr
+syntax:55 (name := bitwiseOr)   pyExpr:55 " | " pyExpr:56 : pyExpr
+syntax:58 (name := bitwiseXor)  pyExpr:58 " ^ " pyExpr:59 : pyExpr
+syntax:60 (name := bitwiseAnd)  pyExpr:60 " & " pyExpr:61 : pyExpr
 
 /- shift_expr -/
 syntax:63 (name := shl) pyExpr:63 "<<" pyExpr:65 : pyExpr

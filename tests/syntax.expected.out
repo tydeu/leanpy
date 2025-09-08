@@ -30,7 +30,7 @@
    (LeanPy.Grammar.ifStmt
     "if"
     (LeanPy.Grammar.namedExpr
-     (group (LeanPy.Grammar.is (LeanPy.Grammar.identExpr `a) "is" (LeanPy.Grammar.noneExpr "None"))))
+     (group (LeanPy.Grammar.isExpr (LeanPy.Grammar.identExpr `a) "is" (LeanPy.Grammar.noneExpr "None"))))
     ":"
     (LeanPy.Grammar.block
      [(LeanPy.Grammar.stmt

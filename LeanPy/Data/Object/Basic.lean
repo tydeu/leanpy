@@ -4,8 +4,10 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
 import Std.Data.HashMap
+import LeanPy.Data.Object.Id
 import LeanPy.Data.HashDict
 import LeanPy.Data.AttrName
+import LeanPy.Util.String
 
 namespace LeanPy
 
@@ -89,6 +91,11 @@ structure Object where
     ty : TypeObject leanTy
     /-- The object's Lean data. -/
     rawData : ObjectData leanTy
+    /--
+    The object's id.
+    See `ObjectId` for details on how LeanPy encodes object identities.
+    -/
+    id : ObjectId
     deriving Nonempty
 
 abbrev AttrDict := HashDict AttrName Object
@@ -107,9 +114,6 @@ structure PyContext where
 /-- The monad of Python code. -/
 abbrev PyM := ReaderT PyContext <| EIO ErrorObject
 
-def Object.mk [TypeName α] (ty : DTypeObject α) (data : α) : Object :=
-  ⟨typeName α, ty, ObjectData.mk' data rfl⟩
-
 structure DObject (α : Type u) [TypeName α] extends Object where
   toObject_leanTy_eq_typeName : toObject.leanTy = typeName α
 
@@ -119,10 +123,18 @@ instance [TypeName α] : CoeOut (DObject α) Object :=
 def DObject.data [Nonempty α] [TypeName α] (self : DObject α) : α :=
   self.rawData.get' self.toObject_leanTy_eq_typeName.symm
 
+namespace Object
+
+def mk
+  [TypeName α] (ty : DTypeObject α) (data : α) (id : ObjectId)
+: Object := ⟨typeName α, ty, ObjectData.mk' data rfl, id⟩
+
 protected def Object.toString (self : Object) : String :=
-  s!"<{self.ty.name} object>" -- TODO: at {addr}
+  s!"<{self.ty.name} object at 0x{self.id.hex}>"
 
 instance : ToString Object := ⟨Object.toString⟩
+
+end Object
 
 /-! ## Slots -/
 
@@ -160,7 +172,7 @@ def noneType : DTypeObject Unit where
   repr := .mk fun _ => pure "None"
 
 def Object.none : Object :=
-  .mk noneType ()
+  .mk noneType () .none
 
 instance : CoeDep (Option α) none Object := ⟨.none⟩
 
@@ -184,14 +196,19 @@ def boolType : DTypeObject Bool where
   repr := .mk fun b => return if b.data then "True" else "False"
 
 protected def Object.false : Object :=
-  .mk boolType false
+  .mk boolType false .false
 
 instance : CoeDep Bool false Object := ⟨Object.false⟩
 
 protected def Object.true : Object :=
-  .mk boolType true
+  .mk boolType true .true
 
 instance : CoeDep Bool true Object := ⟨Object.true⟩
+
+def Object.ofBool (b : Bool) : Object :=
+  if b then true else false
+
+instance : Coe Bool Object := ⟨Object.ofBool⟩
 
 def Object.toBool (self : Object) : PyM Bool :=
   self.ty.bool.call self rfl
