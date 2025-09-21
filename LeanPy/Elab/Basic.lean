@@ -108,6 +108,12 @@ def evalPassStmt : PyEval := fun _ => do
 def evalNoneExpr : PyEval := fun _ => do
   return none
 
+@[py_eval numExpr]
+def evalNumExpr : PyEval := fun stx => do
+  let `(pyExpr| $n:num) := stx
+    | throwError "ill-formed numeric expression"
+  mkIntObject n.getNat
+
 @[py_eval isExpr]
 def evalIsExpr : PyEval := fun stx => do
   let `(pyExpr| $a is $b) := stx

@@ -7,6 +7,7 @@ import Std.Data.HashMap
 import LeanPy.Data.Object.Id
 import LeanPy.Data.HashDict
 import LeanPy.Data.AttrName
+import LeanPy.Data.IntRef
 import LeanPy.Util.String
 
 namespace LeanPy
@@ -176,12 +177,48 @@ def Object.none : Object :=
 
 instance : CoeDep (Option α) none Object := ⟨.none⟩
 
-def Object.isNone (self : Object) : Bool :=
-  self.ty.name == noneType.name
+@[inline] def Object.isNone (self : Object) : Bool :=
+  self.id == .none
 
-/-! ## Boolean Objects -/
+@[simp] theorem Object.isNone_none : isNone none := rfl
 
-deriving instance TypeName for Bool, Int
+/-! ## `int` Objects -/
+
+def intType : DTypeObject IntRef where
+  name := "int"
+  doc? := some "\
+    int([x]) -> integer\n\
+    int(x, base=10) -> integer\n\
+    \n\
+    Convert a number or string to an integer, or return 0 if no arguments\n\
+    are given.  If x is a number, return x.__int__().  For floating point\n\
+    numbers, this truncates towards zero.\n\
+    \n\
+    If x is not a number or if base is given, then x must be a string,\n\
+    bytes, or bytearray instance representing an integer literal in the\n\
+    given base.  The literal can be preceded by '+' or '-' and be surrounded\n\
+    by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\n\
+    Base 0 means to interpret the base from the string as an integer literal.\n\
+    >>> int('0b100', base=0)\n\
+    4\
+  "
+  bool := .mk fun b => return b.data.toInt != 0
+  repr := .mk fun b => return toString b.data.toInt
+
+@[inline] def Object.ofIntRef (n : IntRef) : Object :=
+  .mk intType n n.id
+
+instance : OfNat Object 0 := ⟨.ofIntRef 0⟩
+instance : Coe IntRef Object := ⟨.ofIntRef⟩
+
+theorem Object.zero_eq : (0 : Object) = .ofIntRef 0 := rfl
+
+@[inline] def mkIntObject (n : Int) : BaseIO Object := do
+  Object.ofIntRef <$> mkIntRef n
+
+/-! ## `bool` Objects -/
+
+deriving instance TypeName for Bool
 
 def boolType : DTypeObject Bool where
   name := "bool"

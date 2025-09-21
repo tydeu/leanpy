@@ -28,6 +28,16 @@ open LeanPy
   pass
   None
 
+/-- info: 0 -/
+#guard_msgs in #eval_py 0
+
+/-- info: 255 -/
+#guard_msgs in #eval_py 0xFF
+
+/-- info: 4294967296 -/
+-- smallest platform-independent big int
+#guard_msgs in #eval_py 4294967296
+
 /-- info: False -/
 #guard_msgs in #eval_py None is False
 
