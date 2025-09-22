@@ -26,7 +26,7 @@ def evalCondExpr : PyEval := fun stx => do
   let `(pyExpr| $t if $c else $e) := stx
     | throwError "ill-formed condition expression"
   let c ← evalPy c
-  if (← c.toBool) then
+  if (← c.toBoolM) then
     evalPy t
   else
     evalPy e
@@ -36,14 +36,14 @@ def evalCondStmt : PyEval := fun stx => do
   let `(ifStmt| if $c:namedExpr: $t:block $elifs* $[else: $e?:block]?) := stx
     | throwError "ill-formed if statement"
   let c ← evalPy c
-  if (← c.toBool) then
+  if (← c.toBoolM) then
     evalPy t
   else
     let r? ← elifs.findSomeM? fun stx => withRef stx do
       let `(elifStmt| elif $c:namedExpr: $t:block) := stx
         | throwError "ill-formed elif statment"
       let c ← evalPy c
-      if (← c.toBool) then
+      if (← c.toBoolM) then
         some <$> evalPy t
       else
         return none

@@ -62,6 +62,19 @@ abbrev ReprSlot (ty : DataKind) := Slot ty decl_name%
 
 /-! ## Object Type -/
 
+structure TypeSlotsRef (leanTy : DataKind) where
+  private mk ::
+    private val : NonScalar
+  deriving Nonempty
+
+structure DTypeSlotsRef (α : Type u) [TypeName α] extends TypeSlotsRef (typeName α)
+
+instance [TypeName α] : Nonempty (DTypeSlotsRef α ) :=
+  ⟨⟨Classical.ofNonempty⟩⟩
+
+instance [TypeName α] : CoeOut (DTypeSlotsRef α) (TypeSlotsRef (typeName α)) :=
+  ⟨DTypeSlotsRef.toTypeSlotsRef⟩
+
 /-- An (initialized) Python type object. -/
 -- TODO: Enrich with proper fields
 structure TypeObject (leanTy : DataKind) where
@@ -69,12 +82,8 @@ structure TypeObject (leanTy : DataKind) where
   name : String
   /-- The type's documentation string or `none` if undefined. -/
   doc? : Option String := none
-  /-- The type's `__bool__` slot.  -/
-  bool : BoolSlot leanTy
-  /-- The type's `__repr__` slot.  -/
-  repr : ReprSlot leanTy
-  /-- The type's `__str__` slot.  -/
-  str : ReprSlot leanTy := repr
+  /-- The type's slots. Used to optimize magic methods. -/
+  slots : TypeSlotsRef leanTy
   deriving Nonempty
 
 /-- A Python type object with a known Lean representation. -/
@@ -91,7 +100,7 @@ structure Object where
     /-- The object's Python type. -/
     ty : TypeObject leanTy
     /-- The object's Lean data. -/
-    rawData : ObjectData leanTy
+    dynamicData : ObjectData leanTy
     /--
     The object's id.
     See `ObjectId` for details on how LeanPy encodes object identities.
@@ -115,14 +124,20 @@ structure PyContext where
 /-- The monad of Python code. -/
 abbrev PyM := ReaderT PyContext <| EIO ErrorObject
 
-structure DObject (α : Type u) [TypeName α] extends Object where
-  toObject_leanTy_eq_typeName : toObject.leanTy = typeName α
+structure KObject (d : DataKind) extends Object where
+  toObject_leanTy_eq : toObject.leanTy = d
+
+abbrev DObject (α : Type u) [TypeName α] := KObject (typeName α)
+
+namespace DObject
 
 instance [TypeName α] : CoeOut (DObject α) Object :=
-  ⟨DObject.toObject⟩
+  ⟨KObject.toObject⟩
 
-def DObject.data [Nonempty α] [TypeName α] (self : DObject α) : α :=
-  self.rawData.get' self.toObject_leanTy_eq_typeName.symm
+def data [Nonempty α] [TypeName α] (self : DObject α) : α :=
+  self.dynamicData.get' self.toObject_leanTy_eq.symm
+
+end DObject
 
 namespace Object
 
@@ -139,38 +154,80 @@ end Object
 
 /-! ## Slots -/
 
-set_option linter.unusedVariables.funArgs false in
-@[inline] def BoolSlot.mk' [TypeName α] (fn : DObject α → PyM Bool) (h : typeName α = n) : BoolSlot n :=
-  unsafe unsafeCast fn
+/-- Untyped object slots. -/
+structure BaseTypeSlots (α : Type u) where
+  /-- The type's `__bool__` slot.  -/
+  bool (self : α) : PyM Bool
+  /-- The type's `__repr__` slot.  -/
+  repr (self : α) : PyM String
+  /-- The type's `__str__` slot.  -/
+  str (self : α) : PyM String := repr self
+  deriving Nonempty
 
-@[inline] def BoolSlot.mk [TypeName α] (fn : DObject α → PyM Bool) : BoolSlot (typeName α) :=
-  mk' fn rfl
+/-- Untyped object slots. -/
+abbrev TypeSlots := BaseTypeSlots Object
 
-set_option linter.unusedVariables.funArgs false in
-@[inline] def BoolSlot.call(slot : BoolSlot n) (self : Object) (h : n = self.leanTy) : PyM Bool :=
-  (unsafe unsafeCast slot : Object → PyM Bool) self
+@[inline] private unsafe def mkTypeSlotsRefImpl
+  (slots : TypeSlots) :  BaseIO (TypeSlotsRef leanTy)
+:= pure (unsafeCast slots)
 
-@[inline] def ReprSlot.mk [TypeName α] (fn : DObject α → PyM String) : ReprSlot (typeName α) :=
-  unsafe unsafeCast fn
+@[implemented_by mkTypeSlotsRefImpl]
+opaque mkTypeSlotsRef
+  (slots : TypeSlots) : BaseIO (TypeSlotsRef leanTy)
 
-set_option linter.unusedVariables.funArgs false in
-@[inline] def ReprSlot.call (slot : ReprSlot n) (self : Object) (h : n = self.leanTy) : PyM String :=
-  (unsafe unsafeCast slot : Object → PyM String) self
+/-- Typed object slots. -/
+abbrev DTypeSlots (α : Type u) [TypeName α] := BaseTypeSlots (DObject α)
 
-def Object.repr (self : Object) : PyM String :=
-  self.ty.repr.call self rfl
+instance [TypeName α] : Nonempty (DTypeSlots α) := ⟨{
+  bool := Classical.ofNonempty
+  repr := Classical.ofNonempty
+}⟩
 
-def Object.toStr (self : Object) : PyM String :=
-  self.ty.str.call self rfl
+@[inline] private unsafe def mkDTypeSlotsRefImpl
+  [TypeName α] (slots : DTypeSlots α) :  BaseIO (DTypeSlotsRef α)
+:= pure (unsafeCast slots)
+
+@[implemented_by mkDTypeSlotsRefImpl]
+opaque mkDTypeSlotsRef
+  [TypeName α] (slots : DTypeSlots α) : BaseIO (DTypeSlotsRef α)
+
+/-- Typed object slots. -/
+abbrev KTypeSlots (leanTy : DataKind) := BaseTypeSlots (KObject leanTy)
+
+@[inline] private unsafe def TypeSlotsRef.getImpl
+  (self : TypeSlotsRef leanTy) : BaseIO (KTypeSlots leanTy)
+:= pure (unsafeCast self)
+
+@[implemented_by getImpl]
+opaque TypeSlotsRef.get
+  (self : TypeSlotsRef leanTy) : BaseIO (KTypeSlots leanTy)
+
+@[inline] def Object.slots (self : Object) : TypeSlotsRef self.leanTy :=
+  self.ty.slots
+
+@[inline] def Object.repr (self : Object) : PyM String := do
+  (← self.slots.get).repr ⟨self, rfl⟩
+
+@[inline] def Object.toStringM (self : Object) : PyM String := do
+  (← self.slots.get).str ⟨self, rfl⟩
+
+@[inline] def Object.toBoolM (self : Object) : PyM Bool := do
+  (← self.slots.get).bool ⟨self, rfl⟩
 
 /-! ## None -/
 
 deriving instance TypeName for Unit
 
+def noneTypeSlots : DTypeSlots Unit where
+  bool _ := return true
+  repr _ := return "None"
+
+initialize noneTypeSlotsRef : DTypeSlotsRef Unit ←
+  mkDTypeSlotsRef noneTypeSlots
+
 def noneType : DTypeObject Unit where
   name := "NoneType"
-  bool := .mk fun _ => pure true
-  repr := .mk fun _ => pure "None"
+  slots := noneTypeSlotsRef
 
 def Object.none : Object :=
   .mk noneType () .none
@@ -183,6 +240,13 @@ instance : CoeDep (Option α) none Object := ⟨.none⟩
 @[simp] theorem Object.isNone_none : isNone none := rfl
 
 /-! ## `int` Objects -/
+
+def intTypeSlots : DTypeSlots IntRef where
+  bool b := return b.data.toInt != 0
+  repr b := return toString b.data.toInt
+
+initialize intTypeSlotsRef : DTypeSlotsRef IntRef ←
+  mkDTypeSlotsRef intTypeSlots
 
 def intType : DTypeObject IntRef where
   name := "int"
@@ -202,8 +266,7 @@ def intType : DTypeObject IntRef where
     >>> int('0b100', base=0)\n\
     4\
   "
-  bool := .mk fun b => return b.data.toInt != 0
-  repr := .mk fun b => return toString b.data.toInt
+  slots := intTypeSlotsRef
 
 @[inline] def Object.ofIntRef (n : IntRef) : Object :=
   .mk intType n n.id
@@ -220,6 +283,13 @@ theorem Object.zero_eq : (0 : Object) = .ofIntRef 0 := rfl
 
 deriving instance TypeName for Bool
 
+def boolTypeSlots : DTypeSlots Bool where
+  bool b := return b.data
+  repr b := return if b.data then "True" else "False"
+
+initialize boolTypeSlotsRef : DTypeSlotsRef Bool ←
+  mkDTypeSlotsRef boolTypeSlots
+
 def boolType : DTypeObject Bool where
   name := "bool"
   doc? := some "\
@@ -229,8 +299,7 @@ def boolType : DTypeObject Bool where
     The builtins True and False are the only two instances of the class bool.\n\
     The class bool is a subclass of the class int, and cannot be subclassed.\
   "
-  bool := .mk fun b => return b.data
-  repr := .mk fun b => return if b.data then "True" else "False"
+  slots := boolTypeSlotsRef
 
 protected def Object.false : Object :=
   .mk boolType false .false
@@ -246,6 +315,3 @@ def Object.ofBool (b : Bool) : Object :=
   if b then true else false
 
 instance : Coe Bool Object := ⟨Object.ofBool⟩
-
-def Object.toBool (self : Object) : PyM Bool :=
-  self.ty.bool.call self rfl

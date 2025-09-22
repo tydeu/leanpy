@@ -22,7 +22,7 @@ def PyElabM.liftPyM (x : PyM α) : PyElabM α := fun ctx => do
   | .ok a => return a
   | .error e => -- TODO: Traceback
     let msg ← id do
-      match (← e.toStr.run ctx |>.toBaseIO) with
+      match (← e.toStringM.run ctx |>.toBaseIO) with
       | .ok msg =>
         if msg.isEmpty then
           return e.ty.name
