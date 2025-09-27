@@ -4,6 +4,7 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
 import LeanPy.Data.IntRef
+import LeanPy.Data.NonScalarRef
 import LeanPy.Util.String
 
 namespace LeanPy
@@ -70,9 +71,6 @@ def true : ObjectId := const 2
 def ellipsis : ObjectId := const 3
 def notImplemented : ObjectId := const 4
 
-def nonScalar (n : NonScalar) : ObjectId :=
-  mk (unsafe ptrAddrUnsafe n).toUInt64
-
 end ObjectId
 
 @[inline] def IntRef.id (n : IntRef) : ObjectId :=
@@ -87,3 +85,12 @@ theorem IntRef.id_ne_const : id n ≠ .const c := by
     intro h_eq
     replace h_eq := congrArg (· % 2) h_eq
     simp [IntRef.toNat_addr_of_not_isSmall h, id] at h_eq
+
+@[inline] def NonScalarRef.id (n : NonScalarRef α) : ObjectId :=
+  ⟨n.addr.toUInt64⟩
+
+theorem NonScalarRef.id_ne_const : id n ≠ .const c := by
+  rw [ne_eq, ← ObjectId.toNat_inj]
+  intro h_eq
+  replace h_eq := congrArg (· % 2) h_eq
+  simp [id] at h_eq

@@ -6,38 +6,63 @@ syntax Authors Mac Malone
 
 namespace LeanPy
 
-theorem isValidChar_of_lt_255 (h : n < 255) : isValidChar n := by
+def upperHexByte (n : UInt8) : UInt8 :=
+  if n ≤ 9 then
+    n + 48 -- + '0'
+  else
+    n + 55 -- + ('A' - 10)
+
+theorem isValidChar_of_lt_256 (h : n < 256) : isValidChar n := by
   grind
 
-def upperHexChar (n : UInt32) : Char :=
-  if h : n ≤ 9 then
-    ⟨n + 48, isValidChar_of_lt_255 (by grind)⟩ -- + '0'
-  else if h : n ≤ 0xf then
-    ⟨n + 55, isValidChar_of_lt_255 (by grind)⟩ -- + ('A' - 10)
-  else
-    '*'
+def upperHexChar (n : UInt8) : Char :=
+  ⟨upperHexByte n |>.toUInt32, isValidChar_of_lt_256 <| by
+    simp [UInt32.lt_iff_toNat_lt, (upperHexByte n).toNat_lt]⟩
 
 -- sanity check
 example : "FEDCBA9876543210" =
   (String.mk <| (16).fold (init := []) fun i _ s =>
-    upperHexChar i.toUInt32 :: s)
+    upperHexChar i.toUInt8 :: s)
 := by decide
 
-set_option linter.unusedVariables false in
-def upperHexUInt64 (n : UInt64) : String :=
-  .mk <| (go n []).leftpad 16 '0'
-where
-  go n s :=
-    let d := upperHexChar (n % 16).toUInt32
-    let s := d :: s
-    let n' := n / 16
-    if h : n' = 0 then
-      s
-    else
-      go n' s
-  termination_by n.toNat
-  decreasing_by
-    simp only [UInt64.toNat_div, UInt64.reduceToNat]
-    refine Nat.div_lt_self (k := 16) ?_ (by simp)
-    simp only [← UInt64.toNat_inj, UInt64.toNat_zero] at h
-    exact Nat.pos_of_div_pos (Nat.pos_of_ne_zero h)
+def upperHexUInt8 (n : UInt8) (init := "") : String :=
+  init
+  |>.push (upperHexChar (n >>> 4))
+  |>.push (upperHexChar (n &&& 0xf))
+
+def upperHexUInt16 (n : UInt16) (init := "") : String :=
+  init
+  |>.push (upperHexChar (n >>> 4 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 8 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 12).toUInt8)
+  |>.push (upperHexChar (n &&& 0xf).toUInt8)
+
+def upperHexUInt32 (n : UInt32) (init := "") : String :=
+  init
+  |>.push (upperHexChar (n >>> 4 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 8 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 12 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 16 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 20 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 24 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 28).toUInt8)
+  |>.push (upperHexChar (n &&& 0xf).toUInt8)
+
+def upperHexUInt64 (n : UInt64) (init := "") : String :=
+  init
+  |>.push (upperHexChar (n >>> 4 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 8 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 12 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 16 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 20 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 24 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 28 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 32 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 36 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 40 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 44 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 48 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 52 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 56 &&& 0xf).toUInt8)
+  |>.push (upperHexChar (n >>> 60).toUInt8)
+  |>.push (upperHexChar (n &&& 0xf).toUInt8)

@@ -114,6 +114,14 @@ def evalNumExpr : PyEval := fun stx => do
     | throwError "ill-formed numeric expression"
   mkIntObject n.getNat
 
+@[py_eval strings]
+def evalStrings : PyEval := fun stx => do
+  let `(pyExpr| $ss:str*) := stx
+    | throwError "ill-formed strings"
+  let s := ss.foldl (init := "") fun s sStx =>
+    s ++ sStx.getString
+  mkStringObject s
+
 @[py_eval isExpr]
 def evalIsExpr : PyEval := fun stx => do
   let `(pyExpr| $a is $b) := stx

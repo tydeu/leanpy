@@ -38,6 +38,9 @@ open LeanPy
 -- smallest platform-independent big int
 #guard_msgs in #eval_py 4294967296
 
+/-- info: 'helloworld' -/
+#guard_msgs in #eval_py "hello" "world"
+
 /-- info: False -/
 #guard_msgs in #eval_py None is False
 
