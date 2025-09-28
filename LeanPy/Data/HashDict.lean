@@ -3,70 +3,253 @@ Copyright (c) 2024 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
-import Std.Data.HashMap
-import Std.Data.HashMap.RawLemmas
+import Std.Data.DHashMap.Internal.Index
 
 namespace LeanPy
 
-inductive DictEntry (α : Type u) (β : Type v) where
+abbrev Hash := UInt64
+
+namespace HashDict
+
+inductive Entry (α : Type u) (β : Type v) where
 | protected none
-| protected some (k : α) (v : β)
+| protected some (hash : Hash) (k : α) (v : β)
 
-namespace DictEntry
+namespace Entry
 
-@[inline] def key? (e : DictEntry α β) : Option α :=
+@[inline] def key? (e : Entry α β) : Option α :=
   match e with
   | .none => none
-  | .some k _ => some k
+  | .some _ k _ => some k
 
-@[inline] def value? (e : DictEntry α β) : Option β :=
+@[inline] def value? (e : Entry α β) : Option β :=
   match e with
   | .none => none
-  | .some _ v => some v
+  | .some _ _ v => some v
 
-@[inline] def toOption  (e : DictEntry α β) : Option (α × β) :=
+@[inline] def toOption  (e : Entry α β) : Option (α × β) :=
   match e with
   | .none => none
-  | .some k v => some (k, v)
+  | .some _ k v => some (k, v)
 
-@[inline] def isSome  (e : DictEntry α β) : Bool :=
+@[inline] def isSome  (e : Entry α β) : Bool :=
   match e with
   | .none => false
   | .some .. => true
 
-@[inline] def key  (e : DictEntry α β) (h : isSome e) : α :=
+@[inline] def key  (e : Entry α β) (h : isSome e) : α :=
   match e with
-  | .some k _ => k
+  | .some _ k _ => k
 
-@[inline] def value  (e : DictEntry α β) (h : isSome e) : β :=
+@[inline] def value  (e : Entry α β) (h : isSome e) : β :=
   match e with
-  | .some _ v => v
+  | .some _ _ v => v
 
-end DictEntry
+end Entry
+
+def Internal.mkBucketIdx
+  (size : Nat) (h : 0 < size) (hash : Hash)
+: {u : USize // u.toNat < size} := Std.DHashMap.Internal.mkIdx size h hash
+
+@[inline] def Internal.numBucketsForCapacity (capacity : Nat) : Nat :=
+  -- a "load factor" of 0.75 is the usual standard for hash maps
+  capacity * 4 / 3
+
+structure Bucket where
+  private ofList ::
+    toList : List Nat
+    deriving Nonempty
+
+namespace Bucket
+
+@[match_pattern, inline] def nil : Bucket := ⟨.nil⟩
+
+@[inline] def push (i : Nat) (self : Bucket) : Bucket :=
+ ⟨.cons i self.toList⟩
+
+end Bucket
+
+@[specialize] def Internal.findEntryIdxM [Monad m]
+  (bucket : Bucket) (entries : Array (Entry α β))  (isBEq : α → m (ULift Bool))
+: m (ULift Nat) :=
+  go bucket.toList
+where go bucket := do
+  match bucket with
+  | .nil => return .up entries.size
+  | .cons i t =>
+    if h' : i < entries.size then
+      if let .some _ k _ := entries[i] then
+        if (← isBEq k).down then
+          return .up i
+        else go t
+      else go t
+    else go t
+
+@[inline] def Internal.isBEqM [Pure m] [BEq α] (k₁ k₂ : α) : m (ULift Bool) :=
+  pure <| .up <| k₁ == k₂
+
+structure Buckets where
+  toArray : Array Bucket
+  size_toArray_pos : 0 < toArray.size
+
+namespace Buckets
+
+@[inline] def size (self : Buckets) : Nat :=
+  self.toArray.size
+
+theorem size_pos : 0 < size self := self.size_toArray_pos
+
+def emptyWithCapacity (capacity : Nat) : Buckets where
+  toArray := Array.replicate (Internal.numBucketsForCapacity capacity).nextPowerOfTwo .nil
+  size_toArray_pos := by simpa using Nat.pos_of_isPowerOfTwo (Nat.isPowerOfTwo_nextPowerOfTwo _)
+
+instance : Nonempty Buckets := ⟨.emptyWithCapacity 0⟩
+
+def emptyWithDouble (size : Nat) (h : 0 < size) : Buckets where
+  toArray := Array.replicate (size * 2) .nil
+  size_toArray_pos := by simpa using Nat.mul_pos h Nat.two_pos
+
+def push (hash : Hash) (entryIdx : Nat) (self : Buckets) : Buckets :=
+  let ⟨data, hd⟩ := self
+  let ⟨i, h⟩ := Internal.mkBucketIdx data.size hd hash
+  ⟨data.uset i (data[i].push entryIdx) h, by simpa⟩
+
+end Buckets
 
 /-- Implementation detail of `HashDict`. -/
-structure HashDict.Raw (α : Type u) (β : Type v) where
+structure Raw (α : Type u) (β : Type v) where
   size : Nat
-  indices : Std.HashMap.Raw α Nat
-  entries : Array (DictEntry α β)
+  buckets : Buckets
+  entries : Array (Entry α β)
   deriving Nonempty
 
+namespace Raw
+
+def emptyWithCapacity (capacity : Nat) : Raw α β where
+  size := 0
+  buckets := .emptyWithCapacity capacity
+  entries := .emptyWithCapacity capacity
+
+/-- Copies all the entries from `es` into `self` (which should be a new dictionary). -/
+def reinsert (es : Array (Entry α β)) (self : Raw α β)  : Raw α β :=
+  es.foldl (init := self) fun self e =>
+    match e with
+    | .none => self
+    | e@(.some h _ _) =>
+      let {size, buckets, entries} := self
+      let buckets := buckets.push h entries.size
+      let entries := entries.push e
+      ⟨size, buckets, entries⟩
+
+/-- Remove erased entries from the dictionary. -/
+def compress (self : Raw α β) : Raw α β :=
+  let ⟨size, _, entries⟩ := self
+  reinsert entries {
+    size
+    buckets := .emptyWithCapacity size
+    entries := .emptyWithCapacity size
+  }
+
+/-- Copies all the entries from `self` into a new dictionary with a larger capacity. -/
+def expand (self : Raw α β) : Raw α β :=
+  let ⟨size, ⟨data, hd⟩, entries⟩ := self
+  reinsert entries {
+    size
+    buckets := .emptyWithDouble data.size hd
+    entries := .emptyWithCapacity size.nextPowerOfTwo
+  }
+
+@[inline] def expandIfNecessary (self : Raw α β) : Raw α β :=
+  if Internal.numBucketsForCapacity self.size ≤ self.buckets.size then
+    self
+  else
+    self.expand
+
+def pushCore (hash : Hash) (k : α) (v : β) (self : Raw α β) : Raw α β :=
+  let {size, buckets, entries} := self
+  let buckets := buckets.push hash entries.size
+  let entries := entries.push (.some hash k v)
+  expandIfNecessary ⟨size + 1, buckets, entries⟩
+
+@[inline] def push [Hashable α] (k : α) (v : β) (self : Raw α β) : Raw α β :=
+  self.pushCore (hash k) k v
+
+@[specialize] def insertCoreM [Monad m]
+  (hash : Hash) (k : α) (v : β) (self : Raw α β) (isBEq : α → m (ULift Bool))
+: m (Raw α β) := do
+  let {size, buckets, entries} := self
+  let ⟨data, hd⟩ := buckets
+  let ⟨i, h⟩ := Internal.mkBucketIdx data.size hd hash
+  let bucket := data.uget i h
+  let ⟨entryIdx⟩ ← Internal.findEntryIdxM bucket entries isBEq
+  if h' : entryIdx < entries.size then
+    let entries := entries.set entryIdx (.some hash k v)
+    return {size, buckets, entries}
+  else
+    let data := data.uset i (bucket.push entries.size) h
+    let buckets := ⟨data, by simpa [data]⟩
+    let entries := entries.push (.some hash k v)
+    return expandIfNecessary {size := size + 1, buckets, entries}
+
+@[inline] def insert
+  [Hashable α] [BEq α] (k : α) (v : β) (self : Raw α β)
+: Raw α β := Id.run <| self.insertCoreM (hash k) k v (Internal.isBEqM k)
+
+@[specialize] def eraseCoreM [Monad m]
+  (hash : Hash) (self : Raw α β) (isBEq : α → m (ULift Bool))
+: m (Raw α β) := do
+  let {size, buckets, entries} := self
+  let ⟨data, hd⟩ := buckets
+  let ⟨i, h⟩ := Internal.mkBucketIdx data.size hd hash
+  let bucket := data.uget i h
+  let ⟨entryIdx⟩ ← Internal.findEntryIdxM bucket entries isBEq
+  if h' : entryIdx < entries.size then
+    let entries := entries.set entryIdx .none
+    return {size := size - 1, buckets, entries}
+  else
+    return {size, buckets, entries}
+
+@[inline] def erase
+  [Hashable α] [BEq α] (k : α) (self : Raw α β)
+: Raw α β := Id.run <| self.eraseCoreM (hash k) (Internal.isBEqM k)
+
+@[specialize] def getEntryIdxCoreM [Monad m]
+  (hash : Hash) (self : Raw α β) (isBEq : α → m (ULift Bool))
+: m (ULift Nat) :=
+  let {buckets, entries, ..} := self
+  let ⟨data, hd⟩ := buckets
+  let ⟨i, h⟩ := Internal.mkBucketIdx data.size hd hash
+  let bucket := data.uget i h
+  Internal.findEntryIdxM bucket entries isBEq
+
+@[inline] def getEntryIdx
+  [Hashable α] [BEq α] (k : α) (self : Raw α β)
+: Nat := ULift.down.{0,0} <| Id.run do
+  self.getEntryIdxCoreM (hash k) (Internal.isBEqM k)
+
+@[inline] def contains
+  [Hashable α] [BEq α] (k : α) (self : Raw α β)
+: Bool := self.getEntryIdx k < self.entries.size
+
+@[inline] def get?
+  [Hashable α] [BEq α] (k : α) (self : Raw α β)
+: Option β :=
+  let i := self.getEntryIdx k
+  if h : i < self.entries.size then
+    self.entries[i].value?
+  else none
+
+end Raw
+end HashDict
+
 /-- An insertion-ordered dictionary backed by a `Std.HashMap`. -/
-structure HashDict (α : Type u) [BEq α] [Hashable α] (β : Type v) where
+structure HashDict (α : Type u) (β : Type v) where
   raw : HashDict.Raw α β
-  indices_raw_wf : raw.indices.WF
 
 namespace HashDict
-variable {α : Type u} [BEq α] [Hashable α] {β : Type v}
-
-def Raw.emptyWithCapacity (capacity : Nat) : HashDict.Raw α β where
-  size := 0
-  indices := .emptyWithCapacity capacity
-  entries := .emptyWithCapacity capacity
 
 def emptyWithCapacity (capacity : Nat) : HashDict α β where
   raw := .emptyWithCapacity capacity
-  indices_raw_wf := .emptyWithCapacity
 
 def empty : HashDict α β :=
   emptyWithCapacity 8
@@ -77,17 +260,15 @@ instance : Nonempty (HashDict α β) := ⟨empty⟩
 @[inline] def size (self : HashDict α β) : Nat :=
   self.raw.size
 
-@[inline] def entries (self : HashDict α β) : Array (DictEntry α β) :=
+@[inline] def entries (self : HashDict α β) : Array (Entry α β) :=
   self.raw.entries
-
-@[inline] def indices (self : HashDict α β) : Std.HashMap α Nat :=
-  ⟨⟨self.raw.indices.inner, self.indices_raw_wf.out⟩⟩
 
 def items (self : HashDict α β) : Array (α × β) :=
   self.entries.filterMap (·.toOption)
 
-@[specialize] protected def beq [BEq (α × β)] (self other : HashDict α β) : Bool :=
-  self.items == other.items
+@[inline] protected def beq
+  [BEq (α × β)] (self other : HashDict α β)
+: Bool := self.items == other.items
 
 instance [BEq (α × β)] : BEq (HashDict α β) := ⟨HashDict.beq⟩
 
@@ -100,113 +281,72 @@ def keys (self : HashDict α β) : Array α :=
 def values (self : HashDict α β) : Array β :=
   self.entries.filterMap (·.value?)
 
-@[specialize] def contains (k : α) (self : HashDict α β) : Bool :=
-  self.indices.contains k
+@[inline] def contains [Hashable α] [BEq α] (k : α) (self : HashDict α β) : Bool :=
+  self.raw.contains k
 
-structure Mem (self : HashDict α β) (k : α) : Prop where
-  mem_indices : k ∈ self.indices
-  getElem_indices_lt : self.indices[k] < self.entries.size
-  isSome_getElem_entries : self.entries[self.indices[k]].isSome
+@[inline] def getEntryIdx [Hashable α] [BEq α] (k : α) (self : HashDict α β) : Nat :=
+  self.raw.getEntryIdx k
 
-instance : Membership α (HashDict α β) := ⟨Mem⟩
-
-theorem mem_indices_of_mem {self : HashDict α β}
-  (h : k ∈ self) : k ∈ self.indices
-:= Mem.mem_indices h
-
-macro_rules
-| `(tactic|get_elem_tactic_extensible) =>
-  `(tactic|with_reducible apply mem_indices_of_mem; get_elem_tactic_extensible; done)
-
-theorem getElem_indices_lt_of_mem {self : HashDict α β}
-  (h : k ∈ self) : self.indices[k] < self.entries.size
-:= Mem.getElem_indices_lt h
-
-macro_rules
-| `(tactic|get_elem_tactic_extensible) =>
-  `(tactic|with_reducible apply getElem_indices_lt_of_mem; get_elem_tactic_extensible; done)
-
-theorem isSome_getElem_entries_of_mem {self : HashDict α β}
-  (h : k ∈ self) : self.entries[self.indices[k]].isSome
-:= Mem.isSome_getElem_entries h
-
-private theorem indices_insert_eq_insert_raw_erase {self : HashDict α β} :
-  ⟨self.indices.insert k v |>.inner.inner⟩ = (raw self).indices.insert k v
-:= by
-  simp only [HashDict.indices]
-  simp only [Std.HashMap.insert, Std.DHashMap.insert]
-  simp only [Std.HashMap.Raw.insert, Std.DHashMap.Raw.insert]
-  simp [self.indices_raw_wf.out.size_buckets_pos]
-
-@[specialize] def get (a : α) (self : HashDict α β) (h : a ∈ self) : β :=
-  let i := self.indices[a]
-  self.entries[i].value (isSome_getElem_entries_of_mem h)
-
-@[inline] def getEntryIdx (k : α) (self : HashDict α β) : Nat :=
-  go self.indices k self.entries.size
-where @[specialize] go indices k defVal : Nat :=
-  indices.getD k defVal -- specializes `getD`
-
-@[inline] def getEntryIdx? (k : α) (self : HashDict α β) : Option (Fin self.entries.size) :=
+@[inline] def getEntryIdx?
+  [Hashable α] [BEq α] (k : α) (self : HashDict α β)
+: Option (Fin self.entries.size) :=
   let i := self.getEntryIdx k
   if h : i < self.entries.size then some ⟨i, h⟩ else none
 
-@[inline] def getEntry (k : α) (self : HashDict α β) : DictEntry α β :=
+@[inline] def getEntry
+  [Hashable α] [BEq α] (k : α) (self : HashDict α β)
+: Entry α β :=
   let i := self.getEntryIdx k
   if h : i < self.entries.size then self.entries[i] else .none
 
-@[inline] def get? (k : α) (self : HashDict α β) : Option β :=
-  self.getEntry k |>.value?
+structure Mem [Hashable α] [BEq α] (self : HashDict α β) (k : α)  where
+  getEntryIdx_lt : self.getEntryIdx k < self.entries.size
+  isSome_getElem_entries : self.entries[self.getEntryIdx k].isSome
 
-instance : GetElem? (HashDict α β) α β (fun d k => k ∈ d) where
+instance [Hashable α] [BEq α] : Membership α (HashDict α β) := ⟨Mem⟩
+
+theorem getEntryIdx_lt_of_mem
+  [Hashable α] [BEq α] {self : HashDict α β}
+  (h : k ∈ self) : self.getEntryIdx k < self.entries.size
+:= Mem.getEntryIdx_lt h
+
+macro_rules
+| `(tactic|get_elem_tactic_extensible) =>
+  `(tactic|with_reducible apply getEntryIdx_lt_of_mem; get_elem_tactic_extensible; done)
+
+theorem isSome_getElem_entries_of_mem
+  [Hashable α] [BEq α] {self : HashDict α β}
+  (h : k ∈ self) : self.entries[self.getEntryIdx k].isSome
+:= Mem.isSome_getElem_entries h
+
+@[inline] def get
+  [Hashable α] [BEq α] (k : α) (self : HashDict α β) (h : k ∈ self)
+: β := self.entries[self.getEntryIdx k].value (isSome_getElem_entries_of_mem h)
+
+@[inline] def get?
+  [Hashable α] [BEq α] (k : α) (self : HashDict α β)
+: Option β := self.getEntry k |>.value?
+
+instance [Hashable α] [BEq α] : GetElem? (HashDict α β) α β (fun d k => k ∈ d) where
   getElem d k h := get k d h
   getElem? d k := get? k d
 
-@[specialize] def push (k : α) (v : β) (self : HashDict α β) : HashDict α β where
-  raw.size := self.raw.size + 1
-  raw.entries := self.entries.push <| .some k v
-  raw.indices := ⟨self.indices.insert k self.entries.size |>.inner.inner⟩
-  indices_raw_wf := self.indices_insert_eq_insert_raw_erase ▸
-    .insert self.indices_raw_wf
+@[inline] def push
+  [Hashable α] (k : α) (v : β) (self : HashDict α β)
+: HashDict α β := ⟨self.raw.push k v⟩
 
-@[specialize] def ofArray (items : Array (α × β)) : HashDict α β :=
+@[specialize] def ofArray [Hashable α] (items : Array (α × β)) : HashDict α β :=
   items.foldl (init := emptyWithCapacity items.size) fun d (k, v) =>
     d.push k v
 
-@[specialize] def insert (k : α) (v : β) (self : HashDict α β) : HashDict α β :=
-  if let some i := self.getEntryIdx? k then
-    let size := if self.entries[i].isSome then self.size else self.size + 1
-    {self with
-      raw.size := size,
-      raw.entries := self.entries.set i (.some k v)
-    }
-  else
-    self.push k v
+@[inline] def insert
+  [Hashable α] [BEq α] (k : α) (v : β) (self : HashDict α β)
+: HashDict α β := ⟨self.raw.insert k v⟩
 
-private theorem indices_erase_eq_indices_raw_erase {self : HashDict α β} :
-  ⟨self.indices.erase k |>.inner.inner⟩ = (raw self).indices.erase k
-:= by
-  simp only [HashDict.indices]
-  simp only [Std.HashMap.erase, Std.DHashMap.erase]
-  simp only [Std.HashMap.Raw.erase, Std.DHashMap.Raw.erase]
-  simp [self.indices_raw_wf.out.size_buckets_pos]
-
-@[specialize] def erase (k : α) (self : HashDict α β) : HashDict α β :=
-  if let some i := self.getEntryIdx? k then
-    if self.entries[i].isSome then
-      {self with
-        raw.size := self.raw.size - 1
-        raw.indices := ⟨self.indices.erase k |>.inner.inner⟩
-        raw.entries := self.raw.entries.set i .none i.isLt
-        indices_raw_wf := self.indices_erase_eq_indices_raw_erase ▸
-          .erase self.indices_raw_wf
-      }
-    else
-      self
-  else
-    self
+@[inline] def erase
+  [Hashable α] [BEq α] (k : α) (self : HashDict α β)
+: HashDict α β := ⟨self.raw.erase k⟩
 
 /-- Remove erased entries from the dictionary. -/
 @[inline] def compress (self : HashDict α β) : HashDict α β :=
-  self.entries.foldl (init := .emptyWithCapacity self.size) fun d e =>
-    match e with | .none => d | .some k v => d.push k v
+  ⟨self.raw.compress⟩

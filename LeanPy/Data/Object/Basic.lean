@@ -114,6 +114,9 @@ abbrev AttrDict := HashDict AttrName Object
 -- TODO: Derive from `BaseException`
 abbrev ErrorObject := Object
 
+/-- Mutable dictionary. -/
+abbrev Dict := IO.Ref (HashDict Object (IO.Ref Object))
+
 /-- Mutable dictionary of variables. -/
 abbrev VarDict := IO.Ref AttrDict
 
