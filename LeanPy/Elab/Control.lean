@@ -9,15 +9,29 @@ namespace LeanPy
 
 open Grammar Lean
 
-/-! ## Boolean Expressions -/
+/- ## Basic Statements  -/
 
-@[py_eval falseExpr]
-def evalFalseExpr : PyEval := fun _ =>
-  return false
+@[py_eval passStmt]
+def evalPassStmt : PyEval := fun _ => do
+  return none
 
-@[py_eval trueExpr]
-def evalTrueExpr : PyEval := fun _ =>
-  return true
+@[py_eval returnStmt]
+def evalReturnStmt : PyEval := fun stx => do
+  let `(returnStmt| return%$tk $_) := stx
+    | throwError "ill-formed return statement"
+  throwErrorAt tk "'return' outside function"
+
+@[py_eval yieldExpr]
+def evalYieldExpr : PyEval := fun stx => do
+  let `(yieldExpr| yield%$tk $_) := stx
+    | throwError "ill-formed yield expression"
+  throwErrorAt tk "'yield' outside function"
+
+@[py_eval yieldStmt]
+def evalYieldStmt : PyEval := fun stx => do
+  let `(yieldStmt| yield%$tk $_) := stx
+    | throwError "ill-formed yield statement"
+  throwErrorAt tk "'yield' outside function"
 
 /-! ## Conditionals -/
 

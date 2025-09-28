@@ -9,8 +9,6 @@ namespace LeanPy
 
 open Grammar Lean
 
-/- ## Statement & Expression Combinators -/
-
 def evalPySeq (xs : Array Syntax) : PyEvalM Object :=
   xs.foldlM (init := none) fun _ stx => evalPy stx
 
@@ -79,61 +77,3 @@ def evalGroupExpr : PyEval := fun stx => do
     evalPy x
   | _ =>
     throwError "ill-formed group expression"
-
-/- ## Basic Statements & Expressions -/
-
-@[py_eval returnStmt]
-def evalReturnStmt : PyEval := fun stx => do
-  let `(returnStmt| return%$tk $_) := stx
-    | throwError "ill-formed return statement"
-  throwErrorAt tk "'return' outside function"
-
-@[py_eval yieldExpr]
-def evalYieldExpr : PyEval := fun stx => do
-  let `(yieldExpr| yield%$tk $_) := stx
-    | throwError "ill-formed yield expression"
-  throwErrorAt tk "'yield' outside function"
-
-@[py_eval yieldStmt]
-def evalYieldStmt : PyEval := fun stx => do
-  let `(yieldStmt| yield%$tk $_) := stx
-    | throwError "ill-formed yield statement"
-  throwErrorAt tk "'yield' outside function"
-
-@[py_eval passStmt]
-def evalPassStmt : PyEval := fun _ => do
-  return none
-
-@[py_eval noneExpr]
-def evalNoneExpr : PyEval := fun _ => do
-  return none
-
-@[py_eval numExpr]
-def evalNumExpr : PyEval := fun stx => do
-  let `(pyExpr| $n:num) := stx
-    | throwError "ill-formed numeric expression"
-  mkIntObject n.getNat
-
-@[py_eval strings]
-def evalStrings : PyEval := fun stx => do
-  let `(pyExpr| $ss:str*) := stx
-    | throwError "ill-formed strings"
-  let s := ss.foldl (init := "") fun s sStx =>
-    s ++ sStx.getString
-  mkStringObject s
-
-@[py_eval isExpr]
-def evalIsExpr : PyEval := fun stx => do
-  let `(pyExpr| $a is $b) := stx
-    | throwError "ill-formed 'is' expression"
-  let a ← evalPy a
-  let b ← evalPy b
-  return a.id == b.id
-
-@[py_eval isNotExpr]
-def evalIsNotExpr : PyEval := fun stx => do
-  let `(pyExpr| $a is not $b) := stx
-    | throwError "ill-formed 'is not' expression"
-  let a ← evalPy a
-  let b ← evalPy b
-  return a.id != b.id
