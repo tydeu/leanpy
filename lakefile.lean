@@ -20,7 +20,7 @@ def testLeanFile (testFile : FilePath) : ScriptM UInt32 := do
     cmd := (← getLean).toString
     args := #[testFile.toString]
     env := ← getAugmentedEnv
-    inheritEnv := false
+    inheritEnv := Platform.isOSX -- TODO: Debug why this is needed
   }
   let rc ← child.wait
   if rc == 0 then
@@ -37,7 +37,7 @@ def testLeanOutput (testFile : FilePath) : ScriptM UInt32 := do
     cmd := (← getLean).toString
     args := #[testFile.toString]
     env := ← getAugmentedEnv
-    inheritEnv := false
+    inheritEnv := Platform.isOSX
   }
   let pOut := out.stderr ++ out.stdout
   let pOutFile := testFile.withExtension "produced.out"
@@ -63,7 +63,7 @@ def testLeanPyFile (leanpy : FilePath) (testFile : FilePath) : ScriptM UInt32 :=
   let child ← IO.Process.spawn {
     cmd := leanpy.toString
     args := #[testFile.toString]
-    inheritEnv := false
+    inheritEnv := Platform.isOSX
   }
   let rc ← child.wait
   if rc == 0 then
