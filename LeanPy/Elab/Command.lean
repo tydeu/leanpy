@@ -70,6 +70,6 @@ def elabEvalPyCmd : CommandElab := fun stx => do
     withRef tk do
     let v ← evalPy b
     unless v.isNone do
-      logInfo (← v.repr)
+      logInfo (← v.reprM)
   let ctx ← mkPyContext
   liftCoreM <| ReaderT.run (r := ctx) go

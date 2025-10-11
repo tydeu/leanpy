@@ -29,6 +29,9 @@ theorem isSmallInt_of_lt (h : n.natAbs < 1073741823) : isSmallInt n := by
 theorem isSmallInt_zero : isSmallInt 0 :=
   isSmallInt_of_lt (by decide)
 
+theorem isSmallInt_one : isSmallInt 1 :=
+  isSmallInt_of_lt (by decide)
+
 def smallIntAddr (n : Int) : USize :=
   n.toInt32.toUInt32.toUSize <<< 1 ||| 1
 
@@ -106,6 +109,7 @@ def ofIsSmall (n : Int) (h : isSmallInt n) : IntRef :=
   ⟨.mk (smallIntAddr n) n, by simp [IntRef.WF, h]⟩
 
 instance : OfNat IntRef 0 := ⟨.ofIsSmall 0 isSmallInt_zero⟩
+instance : OfNat IntRef 1 := ⟨.ofIsSmall 1 isSmallInt_one⟩
 
 @[simp] theorem toInt_ofIsSmall : (ofIsSmall n h).toInt = n := rfl
 

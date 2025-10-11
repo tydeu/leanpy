@@ -41,6 +41,8 @@ open LeanPy
 /-- info: 'helloworld' -/
 #guard_msgs in #eval_py "hello" "world"
 
+/-! ## Comparisons -/
+
 /-- info: False -/
 #guard_msgs in #eval_py None is False
 
@@ -53,7 +55,31 @@ open LeanPy
 /-- info: True -/
 #guard_msgs in #eval_py None is None
 
+/-- info: False -/
+#guard_msgs in #eval_py None == 0
+
+/-- info: True -/
+#guard_msgs in #eval_py None != 0
+
+/-- info: False -/
+#guard_msgs in #eval_py 0 == None
+
+/-- info: True -/
+#guard_msgs in #eval_py 0 == False
+
+/-- info: False -/
+#guard_msgs in #eval_py 42 != 42
+
+/-- info: True -/
+#guard_msgs in #eval_py "abc" == "abc"
+
+/-- info: False -/
+#guard_msgs in #eval_py "abc" != "abc"
+
 /-! ## Conditionals -/
+
+/-- info: False -/
+#guard_msgs in #eval_py True if None else False
 
 /-- info: True -/
 #guard_msgs in #eval_py True if True else False

@@ -54,3 +54,19 @@ def evalIsNotExpr : PyEval := fun stx => do
   let a ← evalPy a
   let b ← evalPy b
   return a.id != b.id
+
+@[py_eval eq]
+def evalEq : PyEval := fun stx => do
+  let `(pyExpr| $a == $b) := stx
+    | throwError "ill-formed '==' expression"
+  let a ← evalPy a
+  let b ← evalPy b
+  a.eqOpM b
+
+@[py_eval ne]
+def evalNe : PyEval := fun stx => do
+  let `(pyExpr| $a != $b) := stx
+    | throwError "ill-formed '!=' expression"
+  let a ← evalPy a
+  let b ← evalPy b
+  a.neOpM b

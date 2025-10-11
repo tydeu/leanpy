@@ -161,6 +161,12 @@ end Object
 
 /-- Untyped object slots. -/
 structure BaseTypeSlots (α : Type u) where
+  /-- The type's `__hash__` slot.  -/
+  hash (self : α) : PyM Hash
+  /-- The type's `==` slot. Unlike `__eq__`, this returns `Bool`.  -/
+  eqOp (self : α) (other : Object) : PyM Bool
+  /-- The type's `!=` slot. Unlike `__ne__`, this returns `Bool`. -/
+  neOp (self : α) (other : Object) : PyM Bool := Bool.not <$> eqOp self other
   /-- The type's `__bool__` slot.  -/
   bool (self : α) : PyM Bool
   /-- The type's `__repr__` slot.  -/
@@ -182,11 +188,6 @@ opaque mkTypeSlotsRef
 
 /-- Typed object slots. -/
 abbrev DTypeSlots (α : Type u) [TypeName α] := BaseTypeSlots (DObject α)
-
-instance [TypeName α] : Nonempty (DTypeSlots α) := ⟨{
-  bool := Classical.ofNonempty
-  repr := Classical.ofNonempty
-}⟩
 
 @[inline] private unsafe def mkDTypeSlotsRefImpl
   [TypeName α] (slots : DTypeSlots α) :  BaseIO (DTypeSlotsRef α)
@@ -210,7 +211,16 @@ opaque TypeSlotsRef.get
 @[inline] def Object.slots (self : Object) : TypeSlotsRef self.leanTy :=
   self.ty.slots
 
-@[inline] def Object.repr (self : Object) : PyM String := do
+@[inline] def Object.hashM (self : Object) : PyM Hash := do
+  (← self.slots.get).hash ⟨self, rfl⟩
+
+@[inline] def Object.eqOpM (self other : Object) : PyM Bool := do
+  (← self.slots.get).eqOp ⟨self, rfl⟩ other
+
+@[inline] def Object.neOpM (self other : Object) : PyM Bool := do
+  (← self.slots.get).neOp ⟨self, rfl⟩ other
+
+@[inline] def Object.reprM (self : Object) : PyM String := do
   (← self.slots.get).repr ⟨self, rfl⟩
 
 @[inline] def Object.toStringM (self : Object) : PyM String := do
@@ -223,8 +233,14 @@ opaque TypeSlotsRef.get
 
 deriving instance TypeName for Unit
 
+def noneHash : Hash :=
+  hash ObjectId.none
+
 def noneTypeSlots : DTypeSlots Unit where
-  bool _ := return true
+  hash _ := return noneHash
+  eqOp _ other := return other.id == .none
+  neOp _ other := return other.id != .none
+  bool _ := return false
   repr _ := return "None"
 
 initialize noneTypeSlotsRef : DTypeSlotsRef Unit ←
@@ -234,7 +250,7 @@ def noneType : DTypeObject Unit where
   name := "NoneType"
   slots := noneTypeSlotsRef
 
-def Object.none : Object :=
+protected def Object.none : Object :=
   .mk noneType () .none
 
 instance : CoeDep (Option α) none Object := ⟨.none⟩
@@ -285,7 +301,16 @@ where
     -- TODO: Use unicode definition once Lean has support for it
     Lean.isLetterLike c
 
+@[inline] def Object.getString? (self : Object) : Option String :=
+  if h : typeName StringRef = self.leanTy then -- TODO: Proper type-check
+    some (self.dynamicData.get' h).data
+  else
+    none
+
 def strTypeSlots : DTypeSlots StringRef where
+  hash self := return hash self.data.data -- TODO: salt hash?
+  eqOp self other := return other.getString?.any (self.data.data == ·)
+  neOp self other := return other.getString?.all (self.data.data != ·)
   bool self := return self.data.data.length != 0
   str self := return self.data.data
   repr self := return strRepr self.data.data
@@ -317,7 +342,16 @@ def strType : DTypeObject StringRef where
 
 /-! ## `int` Objects -/
 
+@[inline] def Object.getInt? (self : Object) : Option Int :=
+  if h : typeName IntRef = self.leanTy then -- TODO: Proper type-check
+    some (self.dynamicData.get' h).toInt
+  else
+    none
+
 def intTypeSlots : DTypeSlots IntRef where
+  hash self := return hash self.data.toInt
+  eqOp self other := return other.getInt?.any (self.data.toInt == ·)
+  neOp self other := return other.getInt?.all (self.data.toInt != ·)
   bool b := return b.data.toInt != 0
   repr b := return toString b.data.toInt
 
@@ -357,16 +391,17 @@ theorem Object.zero_eq : (0 : Object) = .ofIntRef 0 := rfl
 
 /-! ## `bool` Objects -/
 
-deriving instance TypeName for Bool
+def boolTypeSlots : DTypeSlots IntRef := {
+  intTypeSlots with
+  repr, str := repr
+}
+where
+  repr b := return if b.data.toInt != 0 then "True" else "False"
 
-def boolTypeSlots : DTypeSlots Bool where
-  bool b := return b.data
-  repr b := return if b.data then "True" else "False"
-
-initialize boolTypeSlotsRef : DTypeSlotsRef Bool ←
+initialize boolTypeSlotsRef : DTypeSlotsRef IntRef ←
   mkDTypeSlotsRef boolTypeSlots
 
-def boolType : DTypeObject Bool where
+def boolType : DTypeObject IntRef where
   name := "bool"
   doc? := some "\
     bool(x) -> bool\n\
@@ -378,12 +413,12 @@ def boolType : DTypeObject Bool where
   slots := boolTypeSlotsRef
 
 protected def Object.false : Object :=
-  .mk boolType false .false
+  .mk boolType 0 .false
 
 instance : CoeDep Bool false Object := ⟨Object.false⟩
 
 protected def Object.true : Object :=
-  .mk boolType true .true
+  .mk boolType 1 .true
 
 instance : CoeDep Bool true Object := ⟨Object.true⟩
 
