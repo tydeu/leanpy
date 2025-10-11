@@ -53,8 +53,7 @@ def evalPyInput
     return messages.add <| mkParserErrorMessage ictx s errorMsg
   else if ictx.input.atEnd s.pos then
     let stx := s.stxStack.back
-    let globals ← IO.mkRef {}
-    let pyCtx : PyContext := {globals}
+    let pyCtx ← mkPyContext
     let ctx := {fileName := ictx.fileName, fileMap := ictx.fileMap}
     let s := {env, messages}
     match (← evalPy stx |>.run pyCtx |>.run ctx s |>.toBaseIO) with

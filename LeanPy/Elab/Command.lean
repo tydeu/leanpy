@@ -58,6 +58,10 @@ open Grammar
 
 scoped syntax (name := evalPyCmd) withPosition("#eval_py" block) : command
 
+def mkPyContext : BaseIO PyContext := do
+  let globals ← mkMutableRef {}
+  return {globals}
+
 @[command_elab evalPyCmd]
 def elabEvalPyCmd : CommandElab := fun stx => do
   let `(#eval_py%$tk $b) := stx
@@ -67,6 +71,5 @@ def elabEvalPyCmd : CommandElab := fun stx => do
     let v ← evalPy b
     unless v.isNone do
       logInfo (← v.repr)
-  let globals ← IO.mkRef {}
-  let ctx : PyContext := {globals}
+  let ctx ← mkPyContext
   liftCoreM <| ReaderT.run (r := ctx) go

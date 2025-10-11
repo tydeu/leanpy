@@ -8,6 +8,8 @@ import LeanPy.Data.Object.Id
 import LeanPy.Data.HashDict
 import LeanPy.Data.AttrName
 import LeanPy.Data.IntRef
+import LeanPy.Data.StringRef
+import LeanPy.Data.MutableRef
 import LeanPy.Util.String
 
 namespace LeanPy
@@ -115,10 +117,10 @@ abbrev AttrDict := HashDict AttrName Object
 abbrev ErrorObject := Object
 
 /-- Mutable dictionary. -/
-abbrev Dict := IO.Ref (HashDict Object (IO.Ref Object))
+abbrev Dict := MutableRef (HashDict Object (MutableRef Object))
 
 /-- Mutable dictionary of variables. -/
-abbrev VarDict := IO.Ref AttrDict
+abbrev VarDict := MutableRef AttrDict
 
 structure PyContext where
   globals : VarDict

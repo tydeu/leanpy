@@ -30,29 +30,10 @@ namespace NonScalarRef
 
 instance : CoeOut (NonScalarRef α) α := ⟨data⟩
 
-private noncomputable def null (a : α) : NonScalarRef α :=
+noncomputable def null (a : α) : NonScalarRef α :=
   ⟨.mk 0 a, by simp⟩
 
-@[simp] private theorem data_null : data (null a) = a := rfl
+@[simp] theorem data_null : data (null a) = a := rfl
 
 instance [Nonempty α] : Nonempty (NonScalarRef α) :=
   ⟨null Classical.ofNonempty⟩
-
-end NonScalarRef
-
-/-! ## StringRef -/
-
-abbrev StringRef := NonScalarRef String
-
-deriving instance TypeName for StringRef
-
-@[inline] private unsafe def mkStringRefImpl
-  (s : String) : BaseIO {r : StringRef // r.data = s}
-:= pure (unsafeCast s)
-
-@[implemented_by mkStringRefImpl]
-opaque mkStringRef' (s : String) : BaseIO {r : StringRef // r.data = s} :=
-  pure ⟨NonScalarRef.null s, NonScalarRef.data_null⟩
-
-@[inline] def mkStringRef (s : String) : BaseIO StringRef := do
-  Subtype.val <$> mkStringRef' s
