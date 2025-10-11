@@ -1,4 +1,4 @@
-import LeanPy
+import LeanPy.Grammar
 
 syntax withPosition("#print_py" LeanPy.Grammar.block) : command
 
