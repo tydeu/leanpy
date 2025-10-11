@@ -38,11 +38,11 @@ set_option linter.unusedVariables.funArgs false in
 @[inline] def ObjectData.mk [TypeName α] (a : α) : ObjectData (typeName α) :=
   mk' a rfl
 
-@[inline] unsafe def ObjectData.getImpl [Nonempty α] [TypeName α] (self : ObjectData n) (_ : typeName α = n) : α :=
+@[inline] unsafe def ObjectData.getImpl [Nonempty α] [TypeName α] (self : ObjectData n) (_ : n = typeName α) : α :=
   unsafeCast self
 
 @[implemented_by getImpl]
-opaque ObjectData.get' [Nonempty α] [TypeName α] (self : ObjectData n) (h : typeName α = n) : α
+opaque ObjectData.get' [Nonempty α] [TypeName α] (self : ObjectData n) (h : n = typeName α) : α
 
 @[inline] def ObjectData.get [Nonempty α] [TypeName α] (self : ObjectData (typeName α)) : α :=
   self.get' rfl
@@ -63,7 +63,6 @@ instance [TypeName α] : CoeOut (DTypeSlotsRef α) (BaseTypeSlotsRef (typeName �
   ⟨DTypeSlotsRef.toBaseTypeSlotsRef⟩
 
 /-- An (initialized) Python type object. -/
--- TODO: Enrich with proper fields
 structure TypeObject where
   /-- The type's name -/
   name : String
@@ -72,16 +71,29 @@ structure TypeObject where
   /-- The type name of the Lean data of the type's objects. -/
   dataTy : DataKind := .anonymous
   /-- The type's parent. -/
-  base? : Option TypeObject
-  /-- The type's method resolution order excluding itself. -/
-  baseMro : List TypeObject
+  base? : Option TypeObject := none
+  /-- Is this a subclass of `str`? -/
+  isStrSubclass : Bool := false
+  dataTy_eq_of_isStrSubclass (h : isStrSubclass) :
+    dataTy = typeName StringRef := by simp
+  -- Is this a subclass of `int`? -/
+  isIntSubclass : Bool := false
+  dataTy_eq_of_isIntSubclass (h : isIntSubclass) :
+    dataTy = typeName IntRef := by simp
   /-- The type's slots. Used to optimize magic methods. -/
   slots : BaseTypeSlotsRef dataTy
-  deriving Nonempty
+
+instance : Nonempty TypeObject := ⟨{
+  name := default
+  slots := Classical.ofNonempty
+}⟩
 
 /-- The type's method resolution order. -/
-@[inline] def TypeObject.mro (self : TypeObject) : List TypeObject :=
-  self :: self.baseMro
+def TypeObject.mro (self : TypeObject) : List TypeObject :=
+  self ::
+    match self with
+    | {base? := some base, ..} => mro base
+    | {base? := none, ..} => []
 
 /-- A Python type object with a known Lean representation. -/
 structure DTypeObject (α : Type u) [TypeName α] extends TypeObject where
@@ -135,7 +147,7 @@ instance [TypeName α] : CoeOut (DObject α) Object :=
   ⟨KObject.toObject⟩
 
 def data [Nonempty α] [TypeName α] (self : DObject α) : α :=
-  self.dynamicData.get' self.dataTy_ty_eq.symm
+  self.dynamicData.get' self.dataTy_ty_eq
 
 end DObject
 
@@ -248,7 +260,6 @@ def objectType : TypeObject where
     instance that has no instance attributes and cannot be given any.\n\
   "
   base? := none
-  baseMro := []
   slots := objectTypeSlotsRef
 
 /-! ## None -/
@@ -269,7 +280,6 @@ initialize noneTypeSlotsRef : DTypeSlotsRef Unit ←
 def noneType : DTypeObject Unit where
   name := "NoneType"
   base? := some objectType
-  baseMro := []
   slots := noneTypeSlotsRef
 
 protected def Object.none : Object :=
@@ -324,8 +334,8 @@ where
     Lean.isLetterLike c
 
 @[inline] def Object.getString? (self : Object) : Option String :=
-  if h : typeName StringRef = self.ty.dataTy then -- TODO: Proper type-check
-    some (self.dynamicData.get' h).data
+  if h : self.ty.isStrSubclass then
+    some (self.dynamicData.get' (self.ty.dataTy_eq_of_isStrSubclass h)).data
   else
     none
 
@@ -355,7 +365,7 @@ def strType : DTypeObject StringRef where
     errors defaults to 'strict'.
   "
   base? := some objectType
-  baseMro := [objectType]
+  isStrSubclass := true
   slots := strTypeSlotsRef
 
 @[inline] def Object.ofStringRef (r : StringRef) : Object :=
@@ -367,8 +377,8 @@ def strType : DTypeObject StringRef where
 /-! ## `int` Objects -/
 
 @[inline] def Object.getInt? (self : Object) : Option Int :=
-  if h : typeName IntRef = self.ty.dataTy then -- TODO: Proper type-check
-    some (self.dynamicData.get' h).toInt
+  if h : self.ty.isIntSubclass then
+    some (self.dynamicData.get' (self.ty.dataTy_eq_of_isIntSubclass h)).toInt
   else
     none
 
@@ -401,7 +411,7 @@ def intType : DTypeObject IntRef where
     4\
   "
   base? := some objectType
-  baseMro := [objectType]
+  isIntSubclass := true
   slots := intTypeSlotsRef
 
 @[inline] def Object.ofIntRef (n : IntRef) : Object :=
@@ -437,7 +447,7 @@ def boolType : DTypeObject IntRef where
     The class bool is a subclass of the class int, and cannot be subclassed.\
   "
   base? := some intType
-  baseMro := [intType, objectType]
+  isIntSubclass := true
   slots := boolTypeSlotsRef
 
 protected def Object.false : Object :=
