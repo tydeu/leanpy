@@ -29,6 +29,8 @@ instance ObjectData.instNonempty : Nonempty (ObjectData ty) :=
 
 open TypeName
 
+deriving instance TypeName for Unit
+
 set_option linter.unusedVariables.funArgs false in
 @[inline] def ObjectData.mk' [TypeName α] (a : α) (h : typeName α = n) : ObjectData n :=
   unsafe unsafeCast a
@@ -45,64 +47,57 @@ opaque ObjectData.get' [Nonempty α] [TypeName α] (self : ObjectData n) (h : ty
 @[inline] def ObjectData.get [Nonempty α] [TypeName α] (self : ObjectData (typeName α)) : α :=
   self.get' rfl
 
-/-! ## Slots -/
-
-private opaque Slot.nonemptyType (ty : DataKind) (name : Lean.Name) : NonemptyType.{0}
-
-/-- Per-type data. -/
-def Slot (ty : DataKind) (name : Lean.Name) : Type :=
-  (Slot.nonemptyType ty name).type
-
-instance Slot.instNonempty : Nonempty (Slot ty name) :=
-  (Slot.nonemptyType ty name).property
-
-/-- The type of built-in slots for `__bool__`. -/
-abbrev BoolSlot (ty : DataKind) := Slot ty decl_name%
-
-/-- The type of built-in slots for `__repr__` and `__str__`. -/
-abbrev ReprSlot (ty : DataKind) := Slot ty decl_name%
-
 /-! ## Object Type -/
 
-structure TypeSlotsRef (leanTy : DataKind) where
+structure BaseTypeSlotsRef (leanTy : DataKind) where
   private mk ::
     private val : NonScalar
   deriving Nonempty
 
-structure DTypeSlotsRef (α : Type u) [TypeName α] extends TypeSlotsRef (typeName α)
+structure DTypeSlotsRef (α : Type u) [TypeName α] extends BaseTypeSlotsRef (typeName α)
 
 instance [TypeName α] : Nonempty (DTypeSlotsRef α ) :=
   ⟨⟨Classical.ofNonempty⟩⟩
 
-instance [TypeName α] : CoeOut (DTypeSlotsRef α) (TypeSlotsRef (typeName α)) :=
-  ⟨DTypeSlotsRef.toTypeSlotsRef⟩
+instance [TypeName α] : CoeOut (DTypeSlotsRef α) (BaseTypeSlotsRef (typeName α)) :=
+  ⟨DTypeSlotsRef.toBaseTypeSlotsRef⟩
 
 /-- An (initialized) Python type object. -/
 -- TODO: Enrich with proper fields
-structure TypeObject (leanTy : DataKind) where
+structure TypeObject where
   /-- The type's name -/
   name : String
   /-- The type's documentation string or `none` if undefined. -/
   doc? : Option String := none
+  /-- The type name of the Lean data of the type's objects. -/
+  dataTy : DataKind := .anonymous
+  /-- The type's parent. -/
+  base? : Option TypeObject
+  /-- The type's method resolution order excluding itself. -/
+  baseMro : List TypeObject
   /-- The type's slots. Used to optimize magic methods. -/
-  slots : TypeSlotsRef leanTy
+  slots : BaseTypeSlotsRef dataTy
   deriving Nonempty
 
-/-- A Python type object with a known Lean representation. -/
-structure DTypeObject (α : Type u) [TypeName α] extends TypeObject (typeName α)
+/-- The type's method resolution order. -/
+@[inline] def TypeObject.mro (self : TypeObject) : List TypeObject :=
+  self :: self.baseMro
 
-instance [TypeName α] : CoeOut (DTypeObject α) (TypeObject (typeName α)) :=
+/-- A Python type object with a known Lean representation. -/
+structure DTypeObject (α : Type u) [TypeName α] extends TypeObject where
+  dataTy := typeName α
+  dataTy_eq_typename : dataTy = typeName α := by rfl
+
+instance [TypeName α] : CoeOut (DTypeObject α) TypeObject :=
   ⟨DTypeObject.toTypeObject⟩
 
 /-- A Python object. -/
 structure Object where
   mk' ::
-    /-- The type name of the object's Lean data. -/
-    leanTy : DataKind
     /-- The object's Python type. -/
-    ty : TypeObject leanTy
+    ty : TypeObject
     /-- The object's Lean data. -/
-    dynamicData : ObjectData leanTy
+    dynamicData : ObjectData ty.dataTy
     /--
     The object's id.
     See `ObjectId` for details on how LeanPy encodes object identities.
@@ -130,7 +125,7 @@ structure PyContext where
 abbrev PyM := ReaderT PyContext <| EIO ErrorObject
 
 structure KObject (d : DataKind) extends Object where
-  toObject_leanTy_eq : toObject.leanTy = d
+  dataTy_ty_eq : ty.dataTy = d
 
 abbrev DObject (α : Type u) [TypeName α] := KObject (typeName α)
 
@@ -140,17 +135,17 @@ instance [TypeName α] : CoeOut (DObject α) Object :=
   ⟨KObject.toObject⟩
 
 def data [Nonempty α] [TypeName α] (self : DObject α) : α :=
-  self.dynamicData.get' self.toObject_leanTy_eq.symm
+  self.dynamicData.get' self.dataTy_ty_eq.symm
 
 end DObject
 
 namespace Object
 
 def mk
-  [TypeName α] (ty : DTypeObject α) (data : α) (id : ObjectId)
-: Object := ⟨typeName α, ty, ObjectData.mk' data rfl, id⟩
+  [TypeName α] (ty : DTypeObject α) (data : α) (id : ObjectId) : Object
+:= ⟨ty, ObjectData.mk' data ty.dataTy_eq_typename.symm, id⟩
 
-protected def Object.toString (self : Object) : String :=
+protected def toString (self : Object) : String :=
   s!"<{self.ty.name} object at 0x{self.id.hex}>"
 
 instance : ToString Object := ⟨Object.toString⟩
@@ -178,13 +173,16 @@ structure BaseTypeSlots (α : Type u) where
 /-- Untyped object slots. -/
 abbrev TypeSlots := BaseTypeSlots Object
 
+/-- Reference to untyped object slots. -/
+abbrev TypeSlotsRef := BaseTypeSlotsRef .anonymous
+
 @[inline] private unsafe def mkTypeSlotsRefImpl
-  (slots : TypeSlots) :  BaseIO (TypeSlotsRef leanTy)
+  (slots : TypeSlots) :  BaseIO TypeSlotsRef
 := pure (unsafeCast slots)
 
 @[implemented_by mkTypeSlotsRefImpl]
 opaque mkTypeSlotsRef
-  (slots : TypeSlots) : BaseIO (TypeSlotsRef leanTy)
+  (slots : TypeSlots) : BaseIO TypeSlotsRef
 
 /-- Typed object slots. -/
 abbrev DTypeSlots (α : Type u) [TypeName α] := BaseTypeSlots (DObject α)
@@ -200,15 +198,15 @@ opaque mkDTypeSlotsRef
 /-- Typed object slots. -/
 abbrev KTypeSlots (leanTy : DataKind) := BaseTypeSlots (KObject leanTy)
 
-@[inline] private unsafe def TypeSlotsRef.getImpl
-  (self : TypeSlotsRef leanTy) : BaseIO (KTypeSlots leanTy)
+@[inline] private unsafe def BaseTypeSlotsRef.getImpl
+  (self : BaseTypeSlotsRef leanTy) : BaseIO (KTypeSlots leanTy)
 := pure (unsafeCast self)
 
 @[implemented_by getImpl]
-opaque TypeSlotsRef.get
-  (self : TypeSlotsRef leanTy) : BaseIO (KTypeSlots leanTy)
+opaque BaseTypeSlotsRef.get
+  (self : BaseTypeSlotsRef leanTy) : BaseIO (KTypeSlots leanTy)
 
-@[inline] def Object.slots (self : Object) : TypeSlotsRef self.leanTy :=
+@[inline] def Object.slots (self : Object) : BaseTypeSlotsRef self.ty.dataTy :=
   self.ty.slots
 
 @[inline] def Object.hashM (self : Object) : PyM Hash := do
@@ -229,9 +227,31 @@ opaque TypeSlotsRef.get
 @[inline] def Object.toBoolM (self : Object) : PyM Bool := do
   (← self.slots.get).bool ⟨self, rfl⟩
 
-/-! ## None -/
+/-! ## `object` -/
 
-deriving instance TypeName for Unit
+def objectTypeSlots : TypeSlots where
+  hash self := return hash self.id
+  eqOp self other := return self.id == other.id
+  neOp self other := return self.id != other.id
+  bool _ := return true
+  repr self := return self.toString
+
+initialize objectTypeSlotsRef : TypeSlotsRef ←
+  mkTypeSlotsRef objectTypeSlots
+
+def objectType : TypeObject where
+  name := "object"
+  doc? := some "\
+    The base class of the class hierarchy.\n\
+    \n\
+    When called, it accepts no arguments and returns a new featureless\n\
+    instance that has no instance attributes and cannot be given any.\n\
+  "
+  base? := none
+  baseMro := []
+  slots := objectTypeSlotsRef
+
+/-! ## None -/
 
 def noneHash : Hash :=
   hash ObjectId.none
@@ -248,6 +268,8 @@ initialize noneTypeSlotsRef : DTypeSlotsRef Unit ←
 
 def noneType : DTypeObject Unit where
   name := "NoneType"
+  base? := some objectType
+  baseMro := []
   slots := noneTypeSlotsRef
 
 protected def Object.none : Object :=
@@ -302,7 +324,7 @@ where
     Lean.isLetterLike c
 
 @[inline] def Object.getString? (self : Object) : Option String :=
-  if h : typeName StringRef = self.leanTy then -- TODO: Proper type-check
+  if h : typeName StringRef = self.ty.dataTy then -- TODO: Proper type-check
     some (self.dynamicData.get' h).data
   else
     none
@@ -332,6 +354,8 @@ def strType : DTypeObject StringRef where
     encoding defaults to sys.getdefaultencoding().\n\
     errors defaults to 'strict'.
   "
+  base? := some objectType
+  baseMro := [objectType]
   slots := strTypeSlotsRef
 
 @[inline] def Object.ofStringRef (r : StringRef) : Object :=
@@ -343,7 +367,7 @@ def strType : DTypeObject StringRef where
 /-! ## `int` Objects -/
 
 @[inline] def Object.getInt? (self : Object) : Option Int :=
-  if h : typeName IntRef = self.leanTy then -- TODO: Proper type-check
+  if h : typeName IntRef = self.ty.dataTy then -- TODO: Proper type-check
     some (self.dynamicData.get' h).toInt
   else
     none
@@ -376,6 +400,8 @@ def intType : DTypeObject IntRef where
     >>> int('0b100', base=0)\n\
     4\
   "
+  base? := some objectType
+  baseMro := [objectType]
   slots := intTypeSlotsRef
 
 @[inline] def Object.ofIntRef (n : IntRef) : Object :=
@@ -410,6 +436,8 @@ def boolType : DTypeObject IntRef where
     The builtins True and False are the only two instances of the class bool.\n\
     The class bool is a subclass of the class int, and cannot be subclassed.\
   "
+  base? := some intType
+  baseMro := [intType, objectType]
   slots := boolTypeSlotsRef
 
 protected def Object.false : Object :=
