@@ -76,6 +76,8 @@ def testLeanPyFile (leanpy : FilePath) (testFile : FilePath) : ScriptM UInt32 :=
 @[test_driver]
 script test do
   let leanpy ← runBuild leanpy.fetch
+  if (← testLeanFile ("tests" / "api.lean")) != 0 then
+    return 1
   if (← testLeanOutput ("tests" / "syntax.lean")) != 0 then
     return 1
   if (← testLeanFile ("tests" / "eval.lean")) != 0 then

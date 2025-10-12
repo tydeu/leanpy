@@ -35,6 +35,9 @@ set_option linter.unusedVariables.funArgs false in
 @[inline] def ObjectData.mk' [TypeName α] (a : α) (h : typeName α = n) : ObjectData n :=
   unsafe unsafeCast a
 
+@[inline] def ObjectData.ofAny (a : α) : ObjectData .anonymous :=
+  unsafe unsafeCast a
+
 @[inline] def ObjectData.mk [TypeName α] (a : α) : ObjectData (typeName α) :=
   mk' a rfl
 
@@ -62,8 +65,8 @@ instance [TypeName α] : Nonempty (DTypeSlotsRef α ) :=
 instance [TypeName α] : CoeOut (DTypeSlotsRef α) (BaseTypeSlotsRef (typeName α)) :=
   ⟨DTypeSlotsRef.toBaseTypeSlotsRef⟩
 
-/-- An (initialized) Python type object. -/
-structure TypeObject where
+/-- A Python type. -/
+structure TypeSpec where
   /-- The type's name -/
   name : String
   /-- The type's documentation string or `none` if undefined. -/
@@ -71,7 +74,7 @@ structure TypeObject where
   /-- The type name of the Lean data of the type's objects. -/
   dataTy : DataKind := .anonymous
   /-- The type's parent. -/
-  base? : Option TypeObject := none
+  base? : Option TypeSpec := none
   /-- Is this a subclass of `str`? -/
   isStrSubclass : Bool := false
   dataTy_eq_of_isStrSubclass (h : isStrSubclass) :
@@ -83,38 +86,39 @@ structure TypeObject where
   /-- The type's slots. Used to optimize magic methods. -/
   slots : BaseTypeSlotsRef dataTy
 
-instance : Nonempty TypeObject := ⟨{
+instance : Nonempty TypeSpec := ⟨{
   name := default
   slots := Classical.ofNonempty
 }⟩
 
 /-- The type's method resolution order. -/
-def TypeObject.mro (self : TypeObject) : List TypeObject :=
+def TypeSpec.mro (self : TypeSpec) : List TypeSpec :=
   self ::
     match self with
     | {base? := some base, ..} => mro base
     | {base? := none, ..} => []
 
-/-- A Python type object with a known Lean representation. -/
-structure DTypeObject (α : Type u) [TypeName α] extends TypeObject where
+/-- A Python type with a known Lean representation. -/
+structure DTypeSpec (α : Type u) [TypeName α] extends TypeSpec where
   dataTy := typeName α
   dataTy_eq_typename : dataTy = typeName α := by rfl
 
-instance [TypeName α] : CoeOut (DTypeObject α) TypeObject :=
-  ⟨DTypeObject.toTypeObject⟩
+instance [TypeName α] : CoeOut (DTypeSpec α) TypeSpec :=
+  ⟨DTypeSpec.toTypeSpec⟩
 
 /-- A Python object. -/
 structure Object where
   mk' ::
-    /-- The object's Python type. -/
-    ty : TypeObject
-    /-- The object's Lean data. -/
-    dynamicData : ObjectData ty.dataTy
     /--
     The object's id.
+
     See `ObjectId` for details on how LeanPy encodes object identities.
     -/
     id : ObjectId
+    /-- The object's Python type. -/
+    ty : TypeSpec
+    /-- The object's Lean data. -/
+    dynamicData : ObjectData ty.dataTy
     deriving Nonempty
 
 abbrev AttrDict := HashDict AttrName Object
@@ -154,8 +158,8 @@ end DObject
 namespace Object
 
 def mk
-  [TypeName α] (ty : DTypeObject α) (data : α) (id : ObjectId) : Object
-:= ⟨ty, ObjectData.mk' data ty.dataTy_eq_typename.symm, id⟩
+  [TypeName α] (ty : DTypeSpec α) (data : α) (id : ObjectId) : Object
+:= ⟨id, ty, ObjectData.mk' data ty.dataTy_eq_typename.symm⟩
 
 protected def toString (self : Object) : String :=
   s!"<{self.ty.name} object at 0x{self.id.hex}>"
@@ -241,17 +245,37 @@ opaque BaseTypeSlotsRef.get
 
 /-! ## `object` -/
 
+/-- Returns the hash of the object's id. -/
+@[inline] protected def Object.hash (self : Object) : Hash :=
+  hash self.id
+
+/--
+Returns whether two objects are identical (have the same id).
+
+This is equivalent to the Python `self is other`.
+-/
+@[inline] protected def Object.beq (self other : Object) : Bool :=
+  self.id == other.id
+
+/--
+Returns whether two objects are not identical (do not have the same id).
+
+This is equivalent to the Python `self is not other`.
+-/
+@[inline] protected def Object.bne (self other : Object) : Bool :=
+  self.id != other.id
+
 def objectTypeSlots : TypeSlots where
-  hash self := return hash self.id
-  eqOp self other := return self.id == other.id
-  neOp self other := return self.id != other.id
+  hash self := return self.hash
+  eqOp self other := return self.beq other
+  neOp self other := return self.bne other
   bool _ := return true
   repr self := return self.toString
 
 initialize objectTypeSlotsRef : TypeSlotsRef ←
   mkTypeSlotsRef objectTypeSlots
 
-def objectType : TypeObject where
+def objectType : TypeSpec where
   name := "object"
   doc? := some "\
     The base class of the class hierarchy.\n\
@@ -259,8 +283,53 @@ def objectType : TypeObject where
     When called, it accepts no arguments and returns a new featureless\n\
     instance that has no instance attributes and cannot be given any.\n\
   "
-  base? := none
   slots := objectTypeSlotsRef
+
+def mkObject : BaseIO Object := do
+  let ref ← mkMutableRef ()
+  return .mk' ref.id objectType (.ofAny ref)
+
+/-! ## `type` -/
+
+deriving instance TypeName for TypeSpec
+
+def typeTypeSlots : DTypeSlots TypeSpec where
+  hash self := return self.hash
+  eqOp self other := return self.beq other
+  neOp self other := return self.bne other
+  bool _ := return true
+  repr self := return s!"<class '{self.data.name}'>"
+
+initialize typeTypeSlotsRef : DTypeSlotsRef TypeSpec ←
+  mkDTypeSlotsRef typeTypeSlots
+
+def typeType : DTypeSpec TypeSpec where
+  name := "type"
+  doc? := some "\
+    type(object) -> the object's type\n\
+    type(name, bases, dict, **kwds) -> a new type\
+  "
+  base? := some objectType
+  slots := typeTypeSlotsRef
+
+abbrev TypeSpecRef := NonScalarRef TypeSpec
+
+deriving instance TypeName for TypeSpecRef
+
+@[inline] private unsafe def mkTypeSpecRefImpl
+  (s : TypeSpec) : BaseIO {r : TypeSpecRef // r.data = s}
+:= pure (unsafeCast s)
+
+@[implemented_by mkTypeSpecRefImpl]
+opaque mkTypeSpecRef' (s : TypeSpec) : BaseIO {r : TypeSpecRef // r.data = s} :=
+  pure ⟨NonScalarRef.null s, NonScalarRef.data_null⟩
+
+@[inline] def mkTypeSpecRef (s : TypeSpec) : BaseIO TypeSpecRef := do
+  Subtype.val <$> mkTypeSpecRef' s
+
+def mkTypeObject (spec : TypeSpec) : BaseIO Object := do
+  let ref ← mkTypeSpecRef spec
+  return .mk typeType ref ref.id
 
 /-! ## None -/
 
@@ -277,7 +346,7 @@ def noneTypeSlots : DTypeSlots Unit where
 initialize noneTypeSlotsRef : DTypeSlotsRef Unit ←
   mkDTypeSlotsRef noneTypeSlots
 
-def noneType : DTypeObject Unit where
+def noneType : DTypeSpec Unit where
   name := "NoneType"
   base? := some objectType
   slots := noneTypeSlotsRef
@@ -350,7 +419,7 @@ def strTypeSlots : DTypeSlots StringRef where
 initialize strTypeSlotsRef : DTypeSlotsRef StringRef ←
   mkDTypeSlotsRef strTypeSlots
 
-def strType : DTypeObject StringRef where
+def strType : DTypeSpec StringRef where
   name := "str"
   doc? := some "\
     str(object='') -> str\n\
@@ -392,7 +461,7 @@ def intTypeSlots : DTypeSlots IntRef where
 initialize intTypeSlotsRef : DTypeSlotsRef IntRef ←
   mkDTypeSlotsRef intTypeSlots
 
-def intType : DTypeObject IntRef where
+def intType : DTypeSpec IntRef where
   name := "int"
   doc? := some "\
     int([x]) -> integer\n\
@@ -437,7 +506,7 @@ where
 initialize boolTypeSlotsRef : DTypeSlotsRef IntRef ←
   mkDTypeSlotsRef boolTypeSlots
 
-def boolType : DTypeObject IntRef where
+def boolType : DTypeSpec IntRef where
   name := "bool"
   doc? := some "\
     bool(x) -> bool\n\
