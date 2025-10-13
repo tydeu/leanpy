@@ -3,18 +3,18 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
-import LeanPy.Util.WithAddr
+import LeanPy.Data.FrozenRef
 
 namespace LeanPy
 
 structure NonScalarRef (α : Type u) where
-  toWithAddr : WithAddr α
-  wf : toWithAddr.addr % 2 = 0
+  toFrozenRef : FrozenRef α
+  wf : toFrozenRef.addr % 2 = 0
 
 namespace NonScalarRef
 
 @[inline] def addr (n : NonScalarRef α) : USize :=
-  n.toWithAddr.addr
+  n.toFrozenRef.addr
 
 @[simp] theorem addr_mk : addr (mk a h) = a.addr := rfl
 
@@ -24,7 +24,7 @@ namespace NonScalarRef
   simpa [← USize.toNat_inj, -addr_mod_two] using addr_mod_two
 
 @[inline] def data (n : NonScalarRef α) : α :=
-  n.toWithAddr.data
+  n.toFrozenRef.data
 
 @[simp] theorem data_mk : data (mk a h) = a.data := rfl
 

@@ -7,7 +7,11 @@ import LeanPy.Data.NonScalarRef
 
 namespace LeanPy
 
-/-- An `IO.Ref` with address information. -/
+/--
+A mutable data cell.
+
+Implemented as an `IO.Ref` with address information.
+-/
 abbrev MutableRef (α : Type) := NonScalarRef (IO.Ref α)
 
 @[inline] private unsafe def mkMutableRefImpl

@@ -3,7 +3,7 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
-import LeanPy.Util.WithAddr
+import LeanPy.Data.FrozenRef
 
 namespace LeanPy
 
@@ -61,23 +61,23 @@ theorem smallIntAddr_ne_zero : smallIntAddr n ≠ 0 := by
 
 /-! ## Int Ref -/
 
-abbrev IntRef.WF (n : WithAddr Int) : Prop :=
+abbrev IntRef.WF (n : FrozenRef Int) : Prop :=
   if isSmallInt n.data then n.addr = smallIntAddr n.data else n.addr % 2 = 0
 
 structure IntRef where
-  toWithAddr : WithAddr Int
-  wf : IntRef.WF toWithAddr
+  toFrozenRef : FrozenRef Int
+  wf : IntRef.WF toFrozenRef
   deriving TypeName
 
 namespace IntRef
 
 @[inline] def addr (n : IntRef) : USize :=
-  n.toWithAddr.addr
+  n.toFrozenRef.addr
 
 @[simp] theorem addr_mk : addr (mk v h) = v.addr := rfl
 
 @[inline] def toInt (n : IntRef) : Int :=
-  n.toWithAddr.data
+  n.toFrozenRef.data
 
 instance : Coe IntRef Int := ⟨toInt⟩
 
@@ -126,10 +126,10 @@ end IntRef
 
 @[noinline] -- prevents compiler from producing incorrect casts
 unsafe def intRefUnsafe (n : Int) : IntRef :=
- unsafeCast n
+  unsafeCast n
 
 @[inline] private unsafe def mkIntRefImpl (n : Int) : BaseIO {r : IntRef // r = n} :=
- pure ⟨intRefUnsafe n, lcProof⟩
+  pure ⟨intRefUnsafe n, lcProof⟩
 
 @[implemented_by mkIntRefImpl]
 opaque mkIntRef' (n : Int) : BaseIO {r : IntRef // r = n} := do
