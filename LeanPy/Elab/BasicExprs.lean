@@ -35,7 +35,7 @@ def evalStrings : PyEval := fun stx => do
     | throwError "ill-formed strings"
   let s := ss.foldl (init := "") fun s sStx =>
     s ++ sStx.getString
-  mkStringObject s
+  mkStrObject s
 
 /-! ## Basic Operations -/
 
@@ -61,7 +61,7 @@ def evalEq : PyEval := fun stx => do
     | throwError "ill-formed '==' expression"
   let a ← evalPy a
   let b ← evalPy b
-  a.eqOpM b
+  a.beqM b
 
 @[py_eval ne]
 def evalNe : PyEval := fun stx => do
@@ -69,4 +69,4 @@ def evalNe : PyEval := fun stx => do
     | throwError "ill-formed '!=' expression"
   let a ← evalPy a
   let b ← evalPy b
-  a.neOpM b
+  a.bneM b
