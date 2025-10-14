@@ -75,6 +75,9 @@ private theorem le_toNat_const : 8589934592 ≤ toNat (const n) := by
 @[reducible] def ellipsis : ObjectId := const 3
 @[reducible] def notImplemented : ObjectId := const 4
 
+@[inline] def isNonScalar (self : ObjectId) : Bool :=
+  self.toNat % 2 = 0
+
 end ObjectId
 
 @[inline] def IntRef.id (n : IntRef) : ObjectId :=
@@ -93,8 +96,11 @@ end ObjectId
 @[inline] def NonScalarRef.id (n : NonScalarRef α) : ObjectId :=
   ⟨n.addr.toUInt64⟩
 
-@[simp] theorem NonScalarRef.id_ne_const : id n ≠ .const c := by
+@[simp] theorem NonScalarRef.id_ne_const : id r ≠ .const c := by
   rw [ne_eq, ← ObjectId.toNat_inj]
   intro h_eq
   replace h_eq := congrArg (· % 2) h_eq
   simp [id] at h_eq
+
+@[simp] theorem NonScalarRef.isNonScalar_id : (id r).isNonScalar := by
+  simp [id, ObjectId.isNonScalar]
