@@ -19,36 +19,50 @@ namespace LeanPy
 /-- The name of an object's Lean data type. -/
 abbrev DataKind := Lean.Name
 
-private opaque ObjectData.nonemptyType (ty : DataKind) : NonemptyType.{0}
-
-/-- Per-type data. -/
-def ObjectData (ty : DataKind) : Type := (ObjectData.nonemptyType ty).type
-
-instance ObjectData.instNonempty : Nonempty (ObjectData ty) :=
-  (ObjectData.nonemptyType ty).property
+/-- Dynamic data index by a `DataKind`. -/
+structure ObjectData where
+  private innerMk ::
+    private innerKind : DataKind
+    private innerValue : NonScalar
+  deriving Nonempty
 
 open TypeName
 
 deriving instance TypeName for Unit
 
-set_option linter.unusedVariables.funArgs false in
-@[inline] def ObjectData.mk' [TypeName α] (a : α) (h : typeName α = n) : ObjectData n :=
-  unsafe unsafeCast a
+namespace ObjectData
 
-@[inline] def ObjectData.ofAny (a : α) : ObjectData .anonymous :=
-  unsafe unsafeCast a
+@[inline] private unsafe def ofAnyImpl (a : α) : ObjectData :=
+  unsafeCast a
 
-@[inline] def ObjectData.mk [TypeName α] (a : α) : ObjectData (typeName α) :=
-  mk' a rfl
+@[implemented_by ofAnyImpl]
+def ofAny (a : α) : ObjectData :=
+  {innerKind := .anonymous, innerValue := unsafe unsafeCast a}
 
-@[inline] unsafe def ObjectData.getImpl [Nonempty α] [TypeName α] (self : ObjectData n) (_ : n = typeName α) : α :=
-  unsafeCast self
+@[inline] private unsafe def mkImpl [TypeName α] (a : α) : ObjectData :=
+  unsafeCast a
+
+@[implemented_by mkImpl]
+def mk [TypeName α] (a : α) : ObjectData :=
+  {innerKind := typeName α, innerValue := unsafe unsafeCast a}
+
+noncomputable def kind (self : ObjectData) : DataKind :=
+  self.innerKind
+
+@[simp] theorem kind_mk  [TypeName α] {a : α} : kind (mk a) = typeName α := rfl
+
+@[inline] private unsafe def getImpl
+  [Nonempty α] [TypeName α]
+  (self : ObjectData) (_ : self.kind = typeName α) : α
+:= unsafeCast self
 
 @[implemented_by getImpl]
-opaque ObjectData.get' [Nonempty α] [TypeName α] (self : ObjectData n) (h : n = typeName α) : α
+opaque get
+  [Nonempty α] [TypeName α]
+  (self : ObjectData) (h : self.kind = typeName α)
+: α
 
-@[inline] def ObjectData.get [Nonempty α] [TypeName α] (self : ObjectData (typeName α)) : α :=
-  self.get' rfl
+end ObjectData
 
 /-! ## Object Type -/
 
@@ -64,6 +78,13 @@ structure TypeSpec where
   dataTy : DataKind := .anonymous
   /-- The type's parent. -/
   base? : Option TypeSpec := none
+  /--
+  Is this type is a legal base for other types.
+  If `false`, this type cannot be legally subtyped.
+
+  Equivalent in functionality to CPython's `Py_TPFLAGS_BASETYPE`.
+  -/
+  isBaseType : Bool := true
   /--
   Is this a subclass of `type`?
 
@@ -129,10 +150,6 @@ theorem subset_trans {a b c : TypeSpec} : a ⊆ b → b ⊆ c → a ⊆ c  := by
   simp only [subset_iff_mem_mro]
   exact fun h₁ h₂ => mem_mro_trans h₂ h₁
 
--- @[simp] theorem not_subset {self : TypeSpec} :
---   ⟨n, d?, dty, none, isType, isStr, isInt, lawfulId⟩ ⊆ self ↔ self
--- := by simp [subset_iff_mem_mro, mro]
-
 end TypeSpec
 
 abbrev TypeSpecRef := NonScalarRef TypeSpec
@@ -152,7 +169,7 @@ opaque mkTypeSpecRef' (s : TypeSpec) : BaseIO {r : TypeSpecRef // r.data = s} :=
 
 /-! ## Builtin types with fast-path type-checking -/
 
-def objectType : TypeSpec where
+@[reducible] def objectType : TypeSpec where
   name := "object"
   doc? := some "\
     The base class of the class hierarchy.\n\
@@ -161,7 +178,13 @@ def objectType : TypeSpec where
     instance that has no instance attributes and cannot be given any.\n\
   "
 
-def typeType : TypeSpec where
+@[reducible] def noneType : TypeSpec where
+  name := "NoneType"
+  base? := some objectType
+  dataTy := typeName Unit
+  isLawfulId id := id == .none
+
+@[reducible] def typeType : TypeSpec where
   name := "type"
   doc? := some "\
     type(object) -> the object's type\n\
@@ -171,7 +194,7 @@ def typeType : TypeSpec where
   base? := some objectType
   dataTy := typeName TypeSpecRef
 
-def strType : TypeSpec where
+@[reducible] def strType : TypeSpec where
   name := "str"
   doc? := some "\
     str(object='') -> str\n\
@@ -189,7 +212,7 @@ def strType : TypeSpec where
   base? := some objectType
   dataTy := typeName StringRef
 
-def intType : TypeSpec where
+@[reducible] def intType : TypeSpec where
   name := "int"
   doc? := some "\
     int([x]) -> integer\n\
@@ -213,17 +236,20 @@ def intType : TypeSpec where
 
 class LawfulType (self : TypeSpec) : Prop where
   isTypeSubclass_iff_subset :
-    self.isTypeSubclass ↔ self ⊆ typeType := by simp
+    self.isTypeSubclass ↔ self ⊆ typeType := by
+      simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
   isIntSubclass_iff_subset :
-    self.isIntSubclass ↔ self ⊆ intType := by simp
+    self.isIntSubclass ↔ self ⊆ intType := by
+      simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
   isStrSubclass_iff_subset :
-    self.isStrSubclass ↔ self ⊆ strType := by simp
+    self.isStrSubclass ↔ self ⊆ strType := by
+      simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
   dataTy_eq_of_isTypeSubclass (h : self.isTypeSubclass) :
-    self.dataTy = typeName TypeSpecRef := by trivial
+    self.dataTy = typeName TypeSpecRef := by simp
   dataTy_eq_of_isStrSubclass (h : self.isStrSubclass) :
-    self.dataTy = typeName StringRef := by trivial
+    self.dataTy = typeName StringRef := by simp
   dataTy_eq_of_isIntSubclass (h : self.isIntSubclass) :
-    self.dataTy = typeName IntRef := by trivial
+    self.dataTy = typeName IntRef := by simp
 
 namespace TypeSpec
 export LawfulType (
@@ -233,14 +259,32 @@ export LawfulType (
 )
 end TypeSpec
 
-/-! ## Object -/
+/-! ## TypeSlotsRef -/
 
-structure PTypeSlotsRef (P : TypeSpec → Prop) where
-  private mk ::
-    private val : NonScalar
+/-- A reference to a `TypeSlots` structure. -/
+structure TypeSlotsRef where
+  private innerMk ::
+    private innerTy : TypeSpec
   deriving Nonempty
 
-abbrev SubTypeSlotsRef (ty : TypeSpec) := PTypeSlotsRef (· ⊆ ty)
+noncomputable def TypeSlotsRef.ty (self : TypeSlotsRef) : TypeSpec :=
+  self.innerTy
+
+theorem TypeSlotsRef.ty_inj : ty a = ty b ↔ a = b := by
+  cases a; cases b; simp [ty]
+
+structure DTypeSlotsRef (ty : TypeSpec) extends TypeSlotsRef where
+  ty_eq : toTypeSlotsRef.ty = ty := by rfl
+
+attribute [simp] DTypeSlotsRef.ty_eq
+
+instance : CoeOut (DTypeSlotsRef ty) TypeSlotsRef :=
+  ⟨DTypeSlotsRef.toTypeSlotsRef⟩
+
+instance : Nonempty (DTypeSlotsRef ty) := ⟨{innerTy := ty}⟩
+
+/-! ## Object -/
+
 /-- A Python object. -/
 structure Object where
   mk' ::
@@ -253,11 +297,16 @@ structure Object where
     /-- The object's Python type. -/
     ty : TypeSpec
     /-- The type's slots. Used to optimize magic methods. -/
-    slots : SubTypeSlotsRef ty
+    rawSlots : TypeSlotsRef
     /-- The object's Lean data. -/
-    dynamicData : ObjectData ty.dataTy
+    dynamicData : ObjectData
     /- Well-formed-ness -/
-    lawful_id : ty.isLawfulId id := by rfl
+    lawful_data : dynamicData.kind = ty.dataTy := by rfl
+    lawful_none : id = .none ↔ ty = noneType := by simp
+    lawful_none_data : ty = noneType → dynamicData = .mk () := by simp
+    lawful_slots : rawSlots.ty = ty := by simp
+    --lawful_none_data : id = .none → dynamicData = noneType := by simp
+    lawful_id : ty.isLawfulId id := by trivial
     lawful_ty : LawfulType ty := by infer_instance
 
 instance {self : Object} : LawfulType self.ty := self.lawful_ty
@@ -310,16 +359,26 @@ abbrev PyM := ReaderT PyContext <| EIO ErrorObject
 namespace Object
 
 def mk
-  [TypeName α] (id : ObjectId) (ty : TypeSpec)
-  (slots : SubTypeSlotsRef ty) (data : α)
-  (h_data : ty.dataTy = typeName α := by rfl)
+  [TypeName α] (id : ObjectId)
+  (ty : TypeSpec) [LawfulType ty]
+  (slots : TypeSlotsRef) (data : α)
+  (h_slots : slots.ty = ty := by simp)
+  (h_data : ty.dataTy = typeName α := by simp)
   (h_id : ty.isLawfulId id := by rfl)
-  (h_ty : LawfulType ty := by infer_instance)
+  (h_none : id = .none ↔ ty = noneType := by simp)
+  (h_none_data : ty = noneType → ObjectData.mk data = .mk () := by simp)
 : Object where
-  id; ty; slots
-  lawful_id := h_id
-  lawful_ty := h_ty
-  dynamicData := ObjectData.mk' data h_data.symm
+  id; ty
+  rawSlots := slots
+  dynamicData := ObjectData.mk data
+  lawful_data := by simp [h_data]
+  lawful_slots := h_slots
+  lawful_none := h_none
+  lawful_none_data := h_none_data
+
+@[inline] def getData
+  [Nonempty α] [TypeName α] (self : Object) (h : self.ty.dataTy = typeName α)
+: α := self.dynamicData.get (Eq.trans self.lawful_data h)
 
 protected def toString (self : Object) : String :=
   s!"<{self.ty.name} object at 0x{self.id.hex}>"
@@ -357,7 +416,7 @@ abbrev SubTypeSlots (ty : TypeSpec) := TypeSlots (SubObject ty)
 : (PTypeSlots q) := unsafeCast slots
 
 @[implemented_by castImpl]
-def TypeSlots.cast
+def TypeSlots.impCast
    (slots : TypeSlots (PObject p)) (h : ∀ {ty}, q ty → p ty)
 : (PTypeSlots q) where
   hash self := slots.hash (self.cast h)
@@ -367,31 +426,38 @@ def TypeSlots.cast
   repr self := slots.repr (self.cast h)
   str self := slots.str (self.cast h)
 
-def TypeSlots.downcast
+@[inline] def TypeSlots.downcast
   (h : ty₂ ⊆ ty₁)  (slots : TypeSlots (SubObject ty₁)) : TypeSlots (SubObject ty₂)
-:= slots.cast (fun h' => TypeSpec.subset_trans h' h)
+:= slots.impCast (fun h' => TypeSpec.subset_trans h' h)
+
+@[inline] def TypeSlots.eqCast
+  (h : ty₁ = ty₂)  (slots : TypeSlots (SubObject ty₁)) : TypeSlots (SubObject ty₂)
+:= slots.impCast (fun h' => h ▸ h')
 
 @[inline] private unsafe def TypeSlots.mkRefImpl
-  (slots :  TypeSlots (SubObject ty)) :  BaseIO (SubTypeSlotsRef ty)
+  (slots : TypeSlots (SubObject ty)) :  BaseIO (DTypeSlotsRef ty)
 := pure (unsafeCast slots)
 
 @[implemented_by mkRefImpl]
 opaque TypeSlots.mkRef
-  (slots :  TypeSlots (SubObject ty)) : BaseIO (SubTypeSlotsRef ty)
+  (slots : TypeSlots (SubObject ty)) : BaseIO (DTypeSlotsRef ty)
 
-@[inline] opaque PTypeSlotsRef.cast
-  (slots : PTypeSlotsRef p) (_ : ∀ ty, q ty → p ty)
-: (PTypeSlotsRef q) := ⟨slots.val⟩
-
-@[inline] private unsafe def SubTypeSlotsRef.getImpl
-  (self : SubTypeSlotsRef p) : BaseIO (SubTypeSlots p)
+@[inline] private unsafe def TypeSlotsRef.getImpl
+  (self : TypeSlotsRef) : BaseIO (SubTypeSlots self.ty)
 := pure (unsafeCast self)
 
 @[implemented_by getImpl]
-opaque SubTypeSlotsRef.get
-  (self : SubTypeSlotsRef ty) : BaseIO (SubTypeSlots ty)
+opaque TypeSlotsRef.get
+  (self : TypeSlotsRef) : BaseIO (SubTypeSlots self.ty)
+
+@[inline] def DTypeSlotsRef.get
+  (self : DTypeSlotsRef ty) : BaseIO (SubTypeSlots ty)
+:= (·.eqCast self.ty_eq) <$> self.toTypeSlotsRef.get
 
 /-! ## Slot-based Methods -/
+
+@[inline] def Object.slots (self : Object) : DTypeSlotsRef self.ty :=
+  ⟨self.rawSlots, self.lawful_slots⟩
 
 @[inline] def Object.hashM (self : Object) : PyM Hash := do
   (← self.slots.get).hash self.toSubObject
@@ -440,16 +506,10 @@ def objectTypeSlots : SubTypeSlots objectType where
   bool _ := return true
   repr self := return self.toString
 
-initialize objectTypeSlotsRef : SubTypeSlotsRef objectType ←
+initialize objectTypeSlotsRef : DTypeSlotsRef objectType ←
   objectTypeSlots.mkRef
 
-instance : LawfulType objectType where
-  isTypeSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, typeType]
-  isIntSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, intType]
-  isStrSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, strType]
+instance : LawfulType objectType := {}
 
 def mkObject : BaseIO Object := do
   let ref ← mkMutableRef ()
@@ -483,7 +543,7 @@ theorem isType_toObject (self : TypeObject) : self.toObject.isType :=
   self.ty.isTypeSubclass_iff_subset.mpr self.ty_subset
 
 @[inline] def getTypeSpecRef (self : TypeObject) : TypeSpecRef :=
-  self.dynamicData.get' (self.ty.dataTy_eq_of_isTypeSubclass self.isType_toObject)
+  self.getData (self.ty.dataTy_eq_of_isTypeSubclass self.isType_toObject)
 
 @[inline] def getTypeSpec (self : TypeObject) : TypeSpec :=
   self.getTypeSpecRef.data
@@ -503,18 +563,10 @@ def typeTypeSlots : TypeSlots TypeObject where
   bool _ := return true
   repr self := return self.repr
 
-initialize typeTypeSlotsRef : SubTypeSlotsRef typeType ←
+initialize typeTypeSlotsRef : DTypeSlotsRef typeType ←
   typeTypeSlots.mkRef
 
-instance : LawfulType typeType where
-  dataTy_eq_of_isTypeSubclass := by
-    simp [typeType]
-  isTypeSubclass_iff_subset := by
-    simp [typeType]
-  isIntSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, intType, typeType]
-  isStrSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, strType, typeType]
+instance : LawfulType typeType := {}
 
 def mkTypeObject (spec : TypeSpec) : BaseIO Object := do
   let ref ← mkTypeSpecRef spec
@@ -522,22 +574,15 @@ def mkTypeObject (spec : TypeSpec) : BaseIO Object := do
 
 /-! ## None -/
 
+/--
+Returns whether this object the constant `None`.
+
+Equivalent to the Python `self is None`.
+-/
 @[inline] def Object.isNone (self : Object) : Bool :=
   self.id == .none
 
-def noneType : TypeSpec where
-  name := "NoneType"
-  base? := some objectType
-  dataTy := typeName Unit
-  isLawfulId id := id == .none
-
-instance : LawfulType noneType where
-  isTypeSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, typeType, noneType]
-  isIntSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, intType, noneType]
-  isStrSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, strType, noneType]
+instance : LawfulType noneType := {}
 
 def noneHash : Hash :=
   hash ObjectId.none
@@ -549,7 +594,7 @@ def noneTypeSlots : SubTypeSlots noneType where
   bool _ := return false
   repr _ := return "None"
 
-initialize noneTypeSlotsRef : SubTypeSlotsRef noneType ←
+initialize noneTypeSlotsRef : DTypeSlotsRef noneType ←
   noneTypeSlots.mkRef
 
 protected def Object.none : Object :=
@@ -558,6 +603,15 @@ protected def Object.none : Object :=
 instance : CoeDep (Option α) none Object := ⟨.none⟩
 
 @[simp] theorem Object.isNone_none : isNone none := rfl
+
+theorem Object.isNone_iff_eq_none : isNone self ↔ self = none := by
+  let {lawful_none, lawful_slots, lawful_none_data,  ..} := self
+  simp only [Object.none, mk, mk'.injEq]
+  simp only [isNone, beq_iff_eq, iff_self_and]
+  intro id_eq
+  have ty_eq := lawful_none.mp id_eq
+  have data_eq := lawful_none_data ty_eq
+  simp [ty_eq, data_eq, ← TypeSlotsRef.ty_inj, lawful_slots]
 
 instance : Inhabited Object := ⟨none⟩
 
@@ -629,7 +683,7 @@ theorem isStr_toObject (self : StrObject) : self.toObject.isStr :=
   self.ty.isStrSubclass_iff_subset.mpr self.ty_subset
 
 @[inline] def getStringRef (self : StrObject) : StringRef :=
-  self.dynamicData.get' <| self.ty.dataTy_eq_of_isStrSubclass self.isStr_toObject
+  self.getData <| self.ty.dataTy_eq_of_isStrSubclass self.isStr_toObject
 
 @[inline] def getString (self : StrObject) : String :=
   self.getStringRef.data
@@ -665,18 +719,10 @@ def strTypeSlots : TypeSlots StrObject where
   str self := return self.toString
   repr self := return self.repr
 
-initialize strTypeSlotsRef : SubTypeSlotsRef strType ←
+initialize strTypeSlotsRef : DTypeSlotsRef strType ←
   strTypeSlots.mkRef
 
-instance : LawfulType strType where
-  dataTy_eq_of_isStrSubclass := by
-    simp [strType]
-  isTypeSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, typeType, strType]
-  isIntSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, intType, strType]
-  isStrSubclass_iff_subset := by
-    simp [strType]
+instance : LawfulType strType := {}
 
 @[inline] def StrObject.ofStringRef (r : StringRef) : StrObject :=
   Object.mk r.id strType strTypeSlotsRef r |>.toSubObject
@@ -706,7 +752,7 @@ theorem isInt_toObject (self : IntObject) : self.toObject.isInt :=
   self.ty.isIntSubclass_iff_subset.mpr self.ty_subset
 
 @[inline] def getIntRef (self : IntObject) : IntRef :=
-  self.dynamicData.get' <| self.ty.dataTy_eq_of_isIntSubclass self.isInt_toObject
+  self.getData <| self.ty.dataTy_eq_of_isIntSubclass self.isInt_toObject
 
 @[inline] def getInt (self : IntObject) : Int :=
   self.getIntRef.toInt
@@ -736,18 +782,10 @@ def intTypeSlots : TypeSlots IntObject where
   str self := return self.toString
   repr self := return self.repr
 
-initialize intTypeSlotsRef : SubTypeSlotsRef intType ←
+initialize intTypeSlotsRef : DTypeSlotsRef intType ←
   intTypeSlots.mkRef
 
-instance : LawfulType intType where
-  dataTy_eq_of_isIntSubclass := by
-    simp [intType]
-  isTypeSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, typeType, intType]
-  isIntSubclass_iff_subset := by
-    simp [intType]
-  isStrSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, strType, intType]
+instance : LawfulType intType := {}
 
 @[inline] def IntObject.ofIntRef (n : IntRef) : IntObject :=
   Object.mk n.id intType intTypeSlotsRef n |>.toSubObject
@@ -763,7 +801,7 @@ theorem IntObject.zero_eq : (0 : IntObject) = .ofIntRef 0 := rfl
 
 /-! ## `bool` Objects -/
 
-def boolType : TypeSpec where
+@[reducible] def boolType : TypeSpec where
   name := "bool"
   doc? := some "\
     bool(x) -> bool\n\
@@ -777,6 +815,8 @@ def boolType : TypeSpec where
   dataTy := typeName IntRef
   isLawfulId id := id == .false || id == .true
 
+instance : LawfulType boolType := {}
+
 theorem boolType_subset_intType : boolType ⊆ intType := by
   simp [boolType, TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
 
@@ -788,18 +828,8 @@ def boolTypeSlots : SubTypeSlots boolType :=
   }
   slots.downcast boolType_subset_intType
 
-initialize boolTypeSlotsRef : SubTypeSlotsRef boolType ←
+initialize boolTypeSlotsRef : DTypeSlotsRef boolType ←
   boolTypeSlots.mkRef
-
-instance : LawfulType boolType where
-  dataTy_eq_of_isIntSubclass := by
-    simp [boolType]
-  isTypeSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, typeType, intType, boolType]
-  isIntSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, boolType]
-  isStrSubclass_iff_subset := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro, objectType, strType, intType, boolType]
 
 protected def Object.false : Object :=
   .mk .false boolType boolTypeSlotsRef (0 : IntRef)

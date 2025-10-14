@@ -47,7 +47,7 @@ instance : ToString ObjectId := ⟨ObjectId.hex⟩
 def const (n : UInt8) : ObjectId :=
   ⟨(n.toUInt64 + 1) <<< 33 ||| 1⟩
 
-private theorem toNat_const : toNat (const n)  = (n.toNat + 1) * 2 ^ 33 + 1 := by
+private theorem toNat_const : toNat (const n) = (n.toNat + 1) * 2 ^ 33 + 1 := by
   have eq_add_one {n : Nat} (h : n % 2 = 0) : n ||| 1 = n + 1 :=
     Nat.eq_of_testBit_eq fun
     | 0 => by simp [Nat.add_mod, h]
@@ -65,18 +65,22 @@ private theorem le_toNat_const : 8589934592 ≤ toNat (const n) := by
   simp only [toNat_const, Nat.reducePow, Nat.reduceLeDiff]
   exact Nat.le_trans (by simp) (Nat.le_mul_of_pos_left 8589934592 (by simp))
 
-def none : ObjectId := const 0
-def false : ObjectId := const 1
-def true : ObjectId := const 2
-def ellipsis : ObjectId := const 3
-def notImplemented : ObjectId := const 4
+@[simp] theorem const_inj : const n = const m ↔ n = m := by
+  have h : 8589934592 ≠ 0 := by decide
+  simp [← toNat_inj, toNat_const, ← UInt8.toNat_inj, Nat.mul_left_inj h]
+
+@[reducible] def none : ObjectId := const 0
+@[reducible] def false : ObjectId := const 1
+@[reducible] def true : ObjectId := const 2
+@[reducible] def ellipsis : ObjectId := const 3
+@[reducible] def notImplemented : ObjectId := const 4
 
 end ObjectId
 
 @[inline] def IntRef.id (n : IntRef) : ObjectId :=
   ⟨n.addr.toUInt64⟩
 
-theorem IntRef.id_ne_const : id n ≠ .const c := by
+@[simp] theorem IntRef.id_ne_const : id n ≠ .const c := by
   rw [ne_eq, ← ObjectId.toNat_inj]
   if h : n.isSmall then
     refine Nat.ne_of_lt (Nat.lt_of_lt_of_le ?_ ObjectId.le_toNat_const)
@@ -89,7 +93,7 @@ theorem IntRef.id_ne_const : id n ≠ .const c := by
 @[inline] def NonScalarRef.id (n : NonScalarRef α) : ObjectId :=
   ⟨n.addr.toUInt64⟩
 
-theorem NonScalarRef.id_ne_const : id n ≠ .const c := by
+@[simp] theorem NonScalarRef.id_ne_const : id n ≠ .const c := by
   rw [ne_eq, ← ObjectId.toNat_inj]
   intro h_eq
   replace h_eq := congrArg (· % 2) h_eq
