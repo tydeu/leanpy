@@ -88,6 +88,9 @@ where go d := do
     return mkApp (mkConst ``symbol) (toExpr tk)
   | .nonReservedSymbol tk includeIdent =>
     return mkApp2 (mkConst ``nonReservedSymbol) (toExpr tk) (toExpr includeIdent)
+  | .unicodeSymbol val asciiVal preserveForPP =>
+    return mkApp3 (mkConst ``unicodeSymbol)
+      (toExpr val) (toExpr asciiVal) (toExpr preserveForPP)
   | .parser constName =>
     return mkConst constName
   | .cat catName prec =>
@@ -244,9 +247,9 @@ def addParserTokens (tks : TokenTable) (p : Parser) : TokenTable :=
 
 def addCategoryTokens (tks : TokenTable) (cat : ParserCategory) : TokenTable :=
   let tks := cat.tables.leadingParsers.foldl fromParsers tks
-  let tks := cat.tables.leadingTable.fold fromTable tks
+  let tks := cat.tables.leadingTable.foldl fromTable tks
   let tks := cat.tables.trailingParsers.foldl fromParsers tks
-  let tks := cat.tables.trailingTable.fold fromTable tks
+  let tks := cat.tables.trailingTable.foldl fromTable tks
   tks
 where
   fromParsers := fun tks (p, _) => addParserTokens tks p

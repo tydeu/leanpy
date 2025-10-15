@@ -15,9 +15,9 @@ def evalPySeq (xs : Array Syntax) : PyEvalM Object :=
 @[py_eval block]
 def evalBlock : PyEval := fun stx => do
   match stx with
-  | `(block| $[\]* $stmts:pySimpleStmt;*) =>
+  | `(Grammar.block| $[\]* $stmts:pySimpleStmt;*) =>
     evalPySeq stmts.getElems
-  | `(block| $stmts:stmt*) =>
+  | `(Grammar.block| $stmts:stmt*) =>
     evalPySeq stmts
   | _ =>
     throwError "ill-formed block"

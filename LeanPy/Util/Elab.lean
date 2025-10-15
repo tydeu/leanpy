@@ -38,7 +38,6 @@ namespace LeanPy
     (mkElabInfoTreeCore elaborator stx trees)
 
 instance : MonadMacroAdapter CoreM where
-  getCurrMacroScope := return (← read).currMacroScope
   getNextMacroScope := return (← get).nextMacroScope
   setNextMacroScope s := do modify ({· with nextMacroScope := s})
 

@@ -8,9 +8,9 @@ import LeanPy.Data.MutableRef
 namespace LeanPy
 
 /-- A fixed runtime address containing no data. -/
-def VoidRef := MutableRef Unit
+abbrev VoidRef := MutableRef Unit
 
-deriving instance TypeName for VoidRef
+instance : TypeName VoidRef := unsafe (.mk _ ``VoidRef)
 
 @[inline] def mkVoidRef : BaseIO VoidRef := do
   mkMutableRef ()

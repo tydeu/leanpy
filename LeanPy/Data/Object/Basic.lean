@@ -29,7 +29,7 @@ structure ObjectData where
 
 open TypeName
 
-deriving instance TypeName for Unit
+instance : TypeName Unit := unsafe (.mk _ ``Unit)
 
 namespace ObjectData
 
@@ -149,7 +149,7 @@ end TypeSpec
 
 abbrev TypeSpecRef := NonScalarRef TypeSpec
 
-deriving instance TypeName for TypeSpecRef
+instance : TypeName TypeSpecRef := unsafe (.mk _ ``TypeSpecRef)
 
 @[inline] private unsafe def mkTypeSpecRefImpl
   (s : TypeSpec) : BaseIO {r : TypeSpecRef // r.data = s}

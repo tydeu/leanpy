@@ -9,7 +9,7 @@ namespace LeanPy
 
 abbrev StringRef := NonScalarRef String
 
-deriving instance TypeName for StringRef
+instance : TypeName StringRef := unsafe (.mk _ ``StringRef)
 
 @[inline] private unsafe def mkStringRefImpl
   (s : String) : BaseIO {r : StringRef // r.data = s}

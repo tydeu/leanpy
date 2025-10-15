@@ -48,10 +48,10 @@ def evalPyInput
   let env := parserExtension.modifyState env fun s =>
     {s with categories := LeanPy.parserCategories}
   let s := file.parser.fn.run ictx
-    { env, options := {} } LeanPy.tokenTable (mkParserState ictx.input)
+    { env, options := {} } LeanPy.tokenTable (mkParserState ictx.inputString)
   if let some errorMsg := s.errorMsg then
     return messages.add <| mkParserErrorMessage ictx s errorMsg
-  else if ictx.input.atEnd s.pos then
+  else if ictx.atEnd s.pos then
     let stx := s.stxStack.back
     let pyCtx ← mkPyContext
     let ctx := {fileName := ictx.fileName, fileMap := ictx.fileMap}
