@@ -249,7 +249,6 @@ opaque mkTypeSpecRef' (s : TypeSpec) : BaseIO {r : TypeSpecRef // r.data = s} :=
     (id = .true → data = .mk (1 : IntRef)) ∧
     data.kind = typeName IntRef -- redundant, but makes `simp_all` work bellow
 
-
 /-! ## LawfulType -/
 
 class LawfulType (self : TypeSpec) : Prop where
@@ -309,27 +308,28 @@ instance : Nonempty (DTypeSlotsRef ty) := ⟨{innerTy := ty}⟩
 
 /-! ## Object -/
 
-/-- A Python object. -/
-structure Object where
-  mk' ::
-    /--
-    The object's id.
+/-- A raw Python object without validity proofs. -/
+structure Object.Raw where mk ::
+  /--
+  The object's id.
 
-    See `ObjectId` for details on how LeanPy encodes object identities.
-    -/
-    protected id : ObjectId
-    /-- The object's Python type. -/
-    protected ty : TypeSpec
-    /-- The type's slots. Used to optimize magic methods. -/
-    rawSlots : TypeSlotsRef
-    /-- The object's Lean data. -/
-    data : ObjectData
-    /- Well-formed-ness -/
-    [lawful_ty : LawfulType ty]
-    lawful_none : id = .none → ty = noneType := by simp
-    lawful_bool : id = .false ∨ id = .true → ty = boolType := by simp
-    lawful_slots : rawSlots.ty = ty := by simp
-    lawful_object : ty.IsValidObject id data := by simp
+  See `ObjectId` for details on how LeanPy encodes object identities.
+  -/
+  protected id : ObjectId
+  /-- The object's Python type. -/
+  protected ty : TypeSpec
+  /-- The type's slots. Used to optimize magic methods. -/
+  innerSlots : TypeSlotsRef
+  /-- The object's Lean data. -/
+  data : ObjectData
+
+/-- A Python object. -/
+structure Object extends raw : Object.Raw where mk' ::
+  [lawful_ty : LawfulType ty]
+  lawful_none : id = .none → ty = noneType := by simp
+  lawful_bool : id = .false ∨ id = .true → ty = boolType := by simp
+  lawful_slots : innerSlots.ty = ty := by simp
+  lawful_object : ty.IsValidObject id data := by simp
 
 instance {self : Object} : LawfulType self.ty := self.lawful_ty
 
@@ -442,7 +442,7 @@ def mk
   (h_bool : id = .false ∨ id = .true → ty = boolType := by simp)
 : Object where
   id; ty
-  rawSlots := slots
+  innerSlots := slots
   data := ObjectData.mk data
   lawful_slots := slots.ty_eq
   lawful_none := h_none
@@ -532,32 +532,28 @@ opaque TypeSlots.mkRef
 opaque TypeSlotsRef.get
   (self : TypeSlotsRef) : BaseIO (SubTypeSlots self.ty)
 
-@[inline] def DTypeSlotsRef.get
-  (self : DTypeSlotsRef ty) : BaseIO (SubTypeSlots ty)
-:= (·.eqCast self.ty_eq) <$> self.toTypeSlotsRef.get
-
 /-! ## Slot-based Methods -/
 
-@[inline] def Object.slots (self : Object) : DTypeSlotsRef self.ty :=
-  ⟨self.rawSlots, self.lawful_slots⟩
+@[inline] def Object.getSlots (self : Object) : BaseIO (SubTypeSlots self.ty) :=
+  (·.eqCast self.lawful_slots) <$> self.innerSlots.get
 
 @[inline] def Object.hashM (self : Object) : PyM Hash := do
-  (← self.slots.get).hash self.toSubObject
+  (← self.getSlots).hash self.toSubObject
 
 @[inline] def Object.beqM (self other : Object) : PyM Bool := do
-  (← self.slots.get).beq self.toSubObject other
+  (← self.getSlots).beq self.toSubObject other
 
 @[inline] def Object.bneM (self other : Object) : PyM Bool := do
-  (← self.slots.get).bne self.toSubObject other
+  (← self.getSlots).bne self.toSubObject other
 
 @[inline] def Object.reprM (self : Object) : PyM String := do
-  (← self.slots.get).repr self.toSubObject
+  (← self.getSlots).repr self.toSubObject
 
 @[inline] def Object.toStringM (self : Object) : PyM String := do
-  (← self.slots.get).str self.toSubObject
+  (← self.getSlots).str self.toSubObject
 
 @[inline] def Object.toBoolM (self : Object) : PyM Bool := do
-  (← self.slots.get).bool self.toSubObject
+  (← self.getSlots).bool self.toSubObject
 
 /-! ## `object` -/
 
@@ -745,9 +741,9 @@ instance : CoeDep (Option α) none NoneObject := ⟨Object.none⟩
 
 @[simp] theorem isNone_none : isNone none := rfl
 
-@[simp] theorem id_none : Object.id none = .none := rfl
-@[simp] theorem ty_none : Object.ty none = noneType := rfl
-@[simp] theorem data_none : Object.data none = .mk () := rfl
+@[simp] theorem id_none : (none : Object).id = .none := rfl
+@[simp] theorem ty_none : (none : Object).ty = noneType := rfl
+@[simp] theorem data_none : (none : Object).data = .mk () := rfl
 
 theorem isNone_iff_eq_none : isNone self ↔ self = none := by
   simp only [isNone, id_none, eq_iff, beq_iff_eq, iff_self_and]
@@ -1060,9 +1056,9 @@ end BoolObject
 
 namespace Object
 
-@[simp] theorem id_true : Object.id true = .true := rfl
-@[simp] theorem ty_true : Object.ty true = boolType := rfl
-@[simp] theorem data_true : Object.data true = .mk (1 : IntRef) := rfl
+@[simp] theorem id_true : (true : Object).id = .true := rfl
+@[simp] theorem ty_true : (true : Object).ty = boolType := rfl
+@[simp] theorem data_true : (true : Object).data = .mk (1 : IntRef) := rfl
 
 theorem isTrue_iff_eq_true : isTrue self ↔ self = true := by
   simp only [isTrue, id_true, eq_iff, beq_iff_eq, iff_self_and]
@@ -1071,9 +1067,9 @@ theorem isTrue_iff_eq_true : isTrue self ↔ self = true := by
   have data_eq := (ty_eq ▸ self.lawful_object).2.2.1 id_eq
   simp [ty_eq, data_eq]
 
-@[simp] theorem id_false : Object.id false = .false := rfl
-@[simp] theorem ty_false : Object.ty false = boolType := rfl
-@[simp] theorem data_false : Object.data false = .mk (0 : IntRef) := rfl
+@[simp] theorem id_false : (false : Object).id = .false := rfl
+@[simp] theorem ty_false : (false : Object).ty = boolType := rfl
+@[simp] theorem data_false : (false : Object).data = .mk (0 : IntRef) := rfl
 
 theorem isFalse_iff_eq_false : isFalse self ↔ self = false := by
   simp only [isFalse, id_false, eq_iff, beq_iff_eq, iff_self_and]
