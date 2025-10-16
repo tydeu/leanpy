@@ -15,7 +15,7 @@ separate file from their parents due to `initialize` limitations.
 
 namespace LeanPy
 
-def boolTypeDoc : String := "\
+def boolType.doc : String := "\
   bool(x) -> bool\n\
   \n\
   Returns True when the argument x is true, False otherwise.\n\
@@ -25,15 +25,16 @@ def boolTypeDoc : String := "\
 
 @[reducible] def boolType : PyType where
   name := "bool"
-  doc? := some boolTypeDoc
+  doc? := some boolType.doc
   base? := some intTypeRef
   isIntSubclass := true
   IsValidObject id data :=
     (id = .false ∨ id = .true) ∧
     (id = .false → data = .mk (0 : IntRef)) ∧
     (id = .true → data = .mk (1 : IntRef)) ∧
-    data.kind = typeName IntRef -- redundant, but makes `simp_all` work bellow
+    -- redundant, but makes `simp_all` work in `LawfulType`
+    data.kind = typeName IntRef
 
-initialize boolTypeRef' : DTypeRef boolType ← mkDTypeRef _
+initialize boolTypeRef.init : InitTypeRef boolType ← initTypeRef
 
-abbrev boolTypeRef : TypeRef := boolTypeRef'.toTypeRef
+abbrev boolTypeRef : TypeRef := boolTypeRef.init.toTypeRef

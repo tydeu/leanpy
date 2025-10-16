@@ -4,83 +4,15 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
 import Std.Data.HashMap
+import LeanPy.Data.Object.TypeRef
 import LeanPy.Data.Object.ObjectTypes2
+import LeanPy.Data.Object.LawfulTypeRef
 import LeanPy.Data.HashDict
 import LeanPy.Data.AttrName
 import LeanPy.Data.VoidRef
 import LeanPy.Util.String
 
 namespace LeanPy
-
-/-! ## LawfulType -/
-
-class LawfulType (self : TypeRef) : Prop where
-  isNonScalar_addr : self.addr % 2 = 0 := by simp
-  subset_objectType : self ⊆ objectTypeRef := by
-    simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
-  isTypeSubclass_iff_subset :
-    self.isTypeSubclass ↔ self ⊆ typeTypeRef := by
-      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
-  isIntSubclass_iff_subset :
-    self.isIntSubclass ↔ self ⊆ intTypeRef := by
-      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
-  isStrSubclass_iff_subset :
-    self.isStrSubclass ↔ self ⊆ strTypeRef := by
-      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
-  isValidObject_mro : ∀ {id data},
-    self.IsValidObject id data → ∀ {ty}, self ⊆ ty → ty.IsValidObject id data
-  := by simp_all [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, TypeRef.mro.go]
-
-namespace TypeRef
-export LawfulType (
-  subset_objectType
-  isTypeSubclass_iff_subset isIntSubclass_iff_subset isStrSubclass_iff_subset
-  isValidObject_mro
-)
-end TypeRef
-
-@[simp] theorem data_objectTypeRef : objectTypeRef.data = objectType := rfl
-
-@[simp] theorem mro_objectTypeRef :
-  objectTypeRef.baseMro = []
-:= rfl
-
-@[simp] theorem data_typeTypeRef : typeTypeRef.data = typeType := rfl
-
-@[simp] theorem baseMro_typeTypeRef :
-  typeTypeRef.baseMro = [objectTypeRef]
-:= rfl
-
-@[simp] theorem data_noneTypeRef : noneTypeRef.data = noneType := rfl
-
-@[simp] theorem baseMro_noneTypeRef :
-  noneTypeRef.baseMro = [objectTypeRef]
-:= rfl
-
-@[simp] theorem data_strTypeRef : strTypeRef.data = strType := rfl
-
-@[simp] theorem baseMro_strTypeRef :
-  strTypeRef.baseMro = [objectTypeRef]
-:= rfl
-
-@[simp] theorem data_intTypeRef : intTypeRef.data = intType := rfl
-
-@[simp] theorem baseMro_intTypeRef :
-  intTypeRef.baseMro = [objectTypeRef]
-:= rfl
-
-@[simp] theorem data_boolTypeRef : boolTypeRef.data = boolType := rfl
-
-@[simp] theorem baseMro_boolTypeRef :
-  boolTypeRef.baseMro = [intTypeRef, objectTypeRef]
-:= rfl
-
-instance : LawfulType objectTypeRef where
-instance : LawfulType typeTypeRef where
-instance : LawfulType noneTypeRef where
-instance : LawfulType strTypeRef where
-instance : LawfulType intTypeRef where
-instance : LawfulType boolTypeRef where
 
 /-! ## TypeSlotsRef -/
 
@@ -125,13 +57,13 @@ structure Object.Raw where mk ::
 
 /-- A Python object. -/
 structure Object extends raw : Object.Raw where mk' ::
-  [lawful_ty : LawfulType ty]
+  [lawful_ty : LawfulTypeRef ty]
   lawful_none : id = .none → ty = noneTypeRef := by simp
   lawful_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp
   lawful_slots : innerSlots.ty = ty := by simp
   lawful_object : ty.data.IsValidObject id data := by simp
 
-instance {self : Object} : LawfulType self.ty := self.lawful_ty
+instance {self : Object} : LawfulTypeRef self.ty := self.lawful_ty
 
 /-! ## TypeProp -/
 
@@ -235,7 +167,7 @@ namespace Object
 
 def mk
   [TypeName α] (id : ObjectId)
-  (ty : TypeRef) [LawfulType ty]
+  (ty : TypeRef) [LawfulTypeRef ty]
   (slots : DTypeSlotsRef ty) (data : α)
   (h : ty.data.IsValidObject id (.mk data) := by simp)
   (h_none : id = .none → ty = noneTypeRef := by simp)
@@ -461,7 +393,7 @@ theorem isType_toObject (self : TypeObject) : self.toObject.isType :=
   self.ty.isTypeSubclass_iff_subset.mpr self.ty_subset
 
 @[inline] def getTypeRef (self : TypeObject) : TypeRef :=
-  self.getData (self.lawful_subobject : typeType.IsValidObject _ _).2
+  ⟨self.getData (self.lawful_subobject : typeType.IsValidObject _ _).2⟩
 
 @[inline] def getType (self : TypeObject) : PyType :=
   self.getTypeRef.data
@@ -484,13 +416,24 @@ def typeTypeSlots : TypeSlots TypeObject where
 initialize typeTypeSlotsRef : DTypeSlotsRef typeTypeRef ←
   typeTypeSlots.mkRef
 
-def TypeObject.ofDTypeRef (ref : DTypeRef ty) : TypeObject :=
-  Object.mk ref.id typeTypeRef typeTypeSlotsRef ref.toTypeRef |>.toSubObject
+namespace TypeObject
 
-instance : CoeOut (DTypeRef ty) TypeObject := ⟨TypeObject.ofDTypeRef⟩
+def ofInitTypeRef (ref : InitTypeRef ty) : TypeObject :=
+  Object.mk ref.id typeTypeRef typeTypeSlotsRef ref.toTypeRef.toRawTypeRef |>.toSubObject
+
+instance : CoeOut (InitTypeRef ty) TypeObject := ⟨ofInitTypeRef⟩
+
+def ofTypeRef (ty : TypeRef) [LawfulTypeRef ty] : TypeObject :=
+  Object.mk ty.id typeTypeRef typeTypeSlotsRef ty.toRawTypeRef |>.toSubObject
+
+instance [LawfulTypeRef ty] : CoeDep TypeRef ty TypeObject := ⟨ofTypeRef ty⟩
+instance [LawfulTypeRef ty] : CoeDep TypeRef ty Object := ⟨ofTypeRef ty⟩
+
+end TypeObject
 
 def mkTypeObject (ty : PyType) : BaseIO TypeObject := do
-  .ofDTypeRef <$> mkDTypeRef ty
+  -- TODO: figure out how to require lawfulness
+  .ofInitTypeRef <$> mkInitTypeRef (ty := ty)
 
 /-! ## None -/
 
@@ -758,7 +701,7 @@ instance : OfNat Object 0 := ⟨(0 : IntObject)⟩
 /-! ## `bool` Objects -/
 
 @[simp] theorem boolTypeRef_subset_intTypeRef : boolTypeRef ⊆ intTypeRef := by
-  simp [TypeRef.subset_iff_eq_or_mem_baseMro]
+  simp [TypeRef.Subtype.iff_eq_or_mem_baseMro]
 
 /-- An instance of a subclass of `bool` that satisfies `p`. -/
 def PBoolObject (p : TypeProp) := PSubIntObject p boolTypeRef
@@ -883,4 +826,3 @@ theorem isFalse_iff_eq_false : isFalse self ↔ self = false := by
   simp [ty_eq, data_eq]
 
 end Object
----/

@@ -23,32 +23,32 @@ namespace LeanPy
   IsValidObject id data :=
     id = .none ∧ data = .mk ()
 
-initialize noneTypeRef' : DTypeRef noneType ← mkDTypeRef _
+initialize noneTypeRef.init : InitTypeRef noneType ← initTypeRef
 
-abbrev noneTypeRef : TypeRef := noneTypeRef'.toTypeRef
+abbrev noneTypeRef : TypeRef := noneTypeRef.init.toTypeRef
 
 /-! ## `type` -/
 
-def typeTypeDoc : String := "\
+def typeType.doc : String := "\
   type(object) -> the object's type\n\
   type(name, bases, dict, **kwds) -> a new type\
   "
 
 @[reducible] def typeType : PyType where
   name := "type"
-  doc? := some typeTypeDoc
+  doc? := some typeType.doc
   isTypeSubclass := true
   base? := some objectTypeRef
   IsValidObject id data :=
-    id.isNonScalar ∧ data.kind = typeName TypeRef
+    id.isNonScalar ∧ data.kind = typeName RawTypeRef
 
-initialize typeTypeRef' : DTypeRef typeType ← mkDTypeRef _
+initialize typeTypeRef.init : InitTypeRef typeType ← initTypeRef
 
-abbrev typeTypeRef : TypeRef := typeTypeRef'.toTypeRef
+abbrev typeTypeRef : TypeRef := typeTypeRef.init.toTypeRef
 
 /-! ## `str` -/
 
-def strTypeDoc : String := "\
+def strType.doc : String := "\
   str(object='') -> str\n\
   str(bytes_or_buffer[, encoding[, errors]]) -> str\n\
   \n\
@@ -63,19 +63,19 @@ def strTypeDoc : String := "\
 
 @[reducible] def strType : PyType where
   name := "str"
-  doc? := some strTypeDoc
+  doc? := some strType.doc
   isStrSubclass := true
   base? := some objectTypeRef
   IsValidObject id data :=
     id.isNonScalar ∧ data.kind = typeName StringRef
 
-initialize strTypeRef' : DTypeRef strType ← mkDTypeRef _
+initialize strTypeRef.init : InitTypeRef strType ← initTypeRef
 
-abbrev strTypeRef : TypeRef := strTypeRef'.toTypeRef
+abbrev strTypeRef : TypeRef := strTypeRef.init.toTypeRef
 
 /-! ## `int` -/
 
-def intTypeDoc : String := "\
+def intType.doc : String := "\
   int([x]) -> integer\n\
   int(x, base=10) -> integer\n\
   \n\
@@ -94,12 +94,12 @@ def intTypeDoc : String := "\
 
 @[reducible] def intType : PyType where
   name := "int"
-  doc? := some intTypeDoc
+  doc? := some intType.doc
   isIntSubclass := true
   base? := some objectTypeRef
   IsValidObject _ data :=
     data.kind = typeName IntRef -- TODO: id.isInt
 
-initialize intTypeRef' : DTypeRef intType ← mkDTypeRef _
+initialize intTypeRef.init : InitTypeRef intType ← initTypeRef
 
-abbrev intTypeRef : TypeRef := intTypeRef'.toTypeRef
+abbrev intTypeRef : TypeRef := intTypeRef.init.toTypeRef
