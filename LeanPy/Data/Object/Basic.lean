@@ -1,302 +1,102 @@
 /-
 Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
-syntax Authors Mac Malone
+Authors: Mac Malone
 -/
 import Std.Data.HashMap
-import LeanPy.Data.Object.Id
+import LeanPy.Data.Object.ObjectTypes2
 import LeanPy.Data.HashDict
 import LeanPy.Data.AttrName
-import LeanPy.Data.IntRef
-import LeanPy.Data.StringRef
-import LeanPy.Data.MutableRef
 import LeanPy.Data.VoidRef
 import LeanPy.Util.String
 
 namespace LeanPy
 
-/-! ## Object Data -/
-
-/-- The name of an object's Lean data type. -/
-abbrev DataKind := Lean.Name
-
-/-- Dynamic data index by a `DataKind`. -/
-structure ObjectData where
-  private innerMk ::
-    private innerKind : DataKind
-    private innerValue : NonScalar
-  deriving Nonempty
-
-open TypeName
-
-instance : TypeName Unit := unsafe (.mk _ ``Unit)
-
-namespace ObjectData
-
-@[inline] private unsafe def mkImpl [TypeName α] (a : α) : ObjectData :=
-  unsafeCast a
-
-@[implemented_by mkImpl]
-def mk [TypeName α] (a : α) : ObjectData :=
-  {innerKind := typeName α, innerValue := unsafe unsafeCast a}
-
-noncomputable def kind (self : ObjectData) : DataKind :=
-  self.innerKind
-
-@[simp] theorem kind_mk  [TypeName α] {a : α} : kind (mk a) = typeName α := rfl
-
-@[inline] private unsafe def getImpl
-  [Nonempty α] [TypeName α]
-  (self : ObjectData) (_ : self.kind = typeName α) : α
-:= unsafeCast self
-
-@[implemented_by getImpl]
-opaque get
-  [Nonempty α] [TypeName α]
-  (self : ObjectData) (h : self.kind = typeName α)
-: α
-
-end ObjectData
-
-/-! ## Object Type -/
-
-/-- A Python type. -/
-structure TypeSpec where
-  /-- The type's name -/
-  name : String
-  /-- The type's documentation string or `none` if undefined. -/
-  doc? : Option String := none
-  /-- The type's parent. -/
-  base? : Option TypeSpec := none
-  /--
-  Is this type is a legal base for other types.
-  If `false`, this type cannot be legally subtyped.
-
-  Equivalent in functionality to CPython's `Py_TPFLAGS_BASETYPE`.
-  -/
-  isBaseType : Bool := true
-  /--
-  Is this a subclass of `type`?
-
-  Equivalent in functionality to CPython's `Py_TPFLAGS_TYPE_SUBCLASS`.
-  -/
-  isTypeSubclass : Bool := false
-  /--
-  Is this a subclass of `str`?
-
-  Equivalent in functionality to CPython's `Py_TPFLAGS_UNICODE_SUBCLASS`.
-  -/
-  isStrSubclass : Bool := false
-  /--
-  Is this a subclass of `int`?
-
-  Equivalent in functionality to CPython's `Py_TPFLAGS_LONG_SUBCLASS`.
-  -/
-  isIntSubclass : Bool := false
-  /-
-  Returns whether the field combination could be a valid object of this type.
-
-  This can be an over-approximation. That is, it may hold for objects
-  which are not objects of this type.
-  -/
-  IsValidObject (id : ObjectId) (data : ObjectData) : Prop := True
-
-instance : Nonempty TypeSpec := ⟨{name := default}⟩
-
-namespace TypeSpec
-
-/-- The type's method resolution order. -/
-@[inline] def mro (self : TypeSpec) : List TypeSpec :=
-  self :: match self with
-    | {base? := none, ..} => []
-    | {base? := some base, ..} => mro base
-
-@[simp] theorem self_mem_mro : self ∈ mro self := by
-  unfold mro; simp
-
-private theorem mem_mro_trans :
-  ty₁ ∈ mro ty₂ → ty₂ ∈ mro self → ty₁ ∈ mro self
-:= by
-  revert ty₂
-  match self with
-  | {base? := none, ..} =>
-    intro ty₂ h₁
-    simp only [mro, List.mem_cons, List.not_mem_nil, or_false]
-    intro h₂
-    simpa [h₂, mro] using h₁
-  | {base? := some base, ..} =>
-    intro ty₂ h₁
-    simp only [mro, List.mem_cons]
-    intro h₂
-    cases h₂ with
-    | inl h₂ => simpa [h₂, mro] using h₁
-    | inr h₂ => exact Or.inr <| mem_mro_trans h₁ h₂
-
-def IsSubtype (self other : TypeSpec) : Prop :=
-  other ∈ self.mro
-
-instance : HasSubset TypeSpec := ⟨TypeSpec.IsSubtype⟩
-
-theorem subset_iff_mem_mro : a ⊆ b ↔ b ∈ mro a := Iff.rfl
-
-@[simp] theorem subset_rfl {self : TypeSpec} : self ⊆ self :=  self_mem_mro
-
-theorem subset_trans {a b c : TypeSpec} : a ⊆ b → b ⊆ c → a ⊆ c  := by
-  simp only [subset_iff_mem_mro]
-  exact fun h₁ h₂ => mem_mro_trans h₂ h₁
-
-end TypeSpec
-
-abbrev TypeSpecRef := NonScalarRef TypeSpec
-
-instance : TypeName TypeSpecRef := unsafe (.mk _ ``TypeSpecRef)
-
-@[inline] private unsafe def mkTypeSpecRefImpl
-  (s : TypeSpec) : BaseIO {r : TypeSpecRef // r.data = s}
-:= pure (unsafeCast s)
-
-@[implemented_by mkTypeSpecRefImpl]
-opaque mkTypeSpecRef' (s : TypeSpec) : BaseIO {r : TypeSpecRef // r.data = s} :=
-  pure ⟨NonScalarRef.null s, NonScalarRef.data_null⟩
-
-@[inline] def mkTypeSpecRef (s : TypeSpec) : BaseIO TypeSpecRef := do
-  Subtype.val <$> mkTypeSpecRef' s
-
-/-! ## Builtin types with fast-path type-checking -/
-
-@[reducible] def objectType : TypeSpec where
-  name := "object"
-  doc? := some "\
-    The base class of the class hierarchy.\n\
-    \n\
-    When called, it accepts no arguments and returns a new featureless\n\
-    instance that has no instance attributes and cannot be given any.\n\
-  "
-
-@[reducible] def noneType : TypeSpec where
-  name := "NoneType"
-  base? := some objectType
-  IsValidObject id data :=
-    id = .none ∧ data = .mk ()
-
-@[reducible] def typeType : TypeSpec where
-  name := "type"
-  doc? := some "\
-    type(object) -> the object's type\n\
-    type(name, bases, dict, **kwds) -> a new type\
-  "
-  isTypeSubclass := true
-  base? := some objectType
-  IsValidObject id data :=
-    id.isNonScalar ∧ data.kind = typeName TypeSpecRef
-
-@[reducible] def strType : TypeSpec where
-  name := "str"
-  doc? := some "\
-    str(object='') -> str\n\
-    str(bytes_or_buffer[, encoding[, errors]]) -> str\n\
-    \n\
-    Create a new string object from the given object. If encoding or\n\
-    errors is specified, then the object must expose a data buffer\n\
-    that will be decoded using the given encoding and error handler.\n\
-    Otherwise, returns the result of object.__str__() (if defined)\n\
-    or repr(object).\n\
-    encoding defaults to sys.getdefaultencoding().\n\
-    errors defaults to 'strict'.\
-  "
-  isStrSubclass := true
-  base? := some objectType
-  IsValidObject id data :=
-    id.isNonScalar ∧ data.kind = typeName StringRef
-
-@[reducible] def intType : TypeSpec where
-  name := "int"
-  doc? := some "\
-    int([x]) -> integer\n\
-    int(x, base=10) -> integer\n\
-    \n\
-    Convert a number or string to an integer, or return 0 if no arguments\n\
-    are given.  If x is a number, return x.__int__().  For floating point\n\
-    numbers, this truncates towards zero.\n\
-    \n\
-    If x is not a number or if base is given, then x must be a string,\n\
-    bytes, or bytearray instance representing an integer literal in the\n\
-    given base.  The literal can be preceded by '+' or '-' and be surrounded\n\
-    by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\n\
-    Base 0 means to interpret the base from the string as an integer literal.\n\
-    >>> int('0b100', base=0)\n\
-    4\
-  "
-  isIntSubclass := true
-  base? := some objectType
-  IsValidObject _ data :=
-    data.kind = typeName IntRef -- TODO: id.isInt
-
-@[reducible] def boolType : TypeSpec where
-  name := "bool"
-  doc? := some "\
-    bool(x) -> bool\n\
-    \n\
-    Returns True when the argument x is true, False otherwise.\n\
-    The builtins True and False are the only two instances of the class bool.\n\
-    The class bool is a subclass of the class int, and cannot be subclassed.\
-  "
-  base? := some intType
-  isIntSubclass := true
-  IsValidObject id data :=
-    (id = .false ∨ id = .true) ∧
-    (id = .false → data = .mk (0 : IntRef)) ∧
-    (id = .true → data = .mk (1 : IntRef)) ∧
-    data.kind = typeName IntRef -- redundant, but makes `simp_all` work bellow
-
 /-! ## LawfulType -/
 
-class LawfulType (self : TypeSpec) : Prop where
-  subset_objectType : self ⊆ objectType := by
-    simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
+class LawfulType (self : TypeSpecRef) : Prop where
+  isNonScalar_addr : self.addr % 2 = 0 := by simp
+  subset_objectType : self ⊆ objectTypeRef := by
+    simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
   isTypeSubclass_iff_subset :
-    self.isTypeSubclass ↔ self ⊆ typeType := by
-      simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
+    self.isTypeSubclass ↔ self ⊆ typeTypeRef := by
+      simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
   isIntSubclass_iff_subset :
-    self.isIntSubclass ↔ self ⊆ intType := by
-      simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
+    self.isIntSubclass ↔ self ⊆ intTypeRef := by
+      simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
   isStrSubclass_iff_subset :
-    self.isStrSubclass ↔ self ⊆ strType := by
-      simp [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
+    self.isStrSubclass ↔ self ⊆ strTypeRef := by
+      simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
   isValidObject_mro : ∀ {id data},
     self.IsValidObject id data → ∀ {ty}, self ⊆ ty → ty.IsValidObject id data
-  := by simp_all [TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
+  := by simp_all [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, TypeSpecRef.mro.go]
 
-namespace TypeSpec
+namespace TypeSpecRef
 export LawfulType (
   subset_objectType
   isTypeSubclass_iff_subset isIntSubclass_iff_subset isStrSubclass_iff_subset
   isValidObject_mro
 )
-end TypeSpec
+end TypeSpecRef
 
-instance : LawfulType objectType where
-instance : LawfulType typeType where
-instance : LawfulType noneType where
-instance : LawfulType strType where
-instance : LawfulType intType where
-instance : LawfulType boolType where
+@[simp] theorem data_objectTypeRef : objectTypeRef.data = objectType := rfl
+
+@[simp] theorem mro_objectTypeRef :
+  objectTypeRef.baseMro = []
+:= rfl
+
+@[simp] theorem data_typeTypeRef : typeTypeRef.data = typeType := rfl
+
+@[simp] theorem baseMro_typeTypeRef :
+  typeTypeRef.baseMro = [objectTypeRef]
+:= rfl
+
+@[simp] theorem data_noneTypeRef : noneTypeRef.data = noneType := rfl
+
+@[simp] theorem baseMro_noneTypeRef :
+  noneTypeRef.baseMro = [objectTypeRef]
+:= rfl
+
+@[simp] theorem data_strTypeRef : strTypeRef.data = strType := rfl
+
+@[simp] theorem baseMro_strTypeRef :
+  strTypeRef.baseMro = [objectTypeRef]
+:= rfl
+
+@[simp] theorem data_intTypeRef : intTypeRef.data = intType := rfl
+
+@[simp] theorem baseMro_intTypeRef :
+  intTypeRef.baseMro = [objectTypeRef]
+:= rfl
+
+@[simp] theorem data_boolTypeRef : boolTypeRef.data = boolType := rfl
+
+@[simp] theorem baseMro_boolTypeRef :
+  boolTypeRef.baseMro = [intTypeRef, objectTypeRef]
+:= rfl
+
+instance : LawfulType objectTypeRef where
+instance : LawfulType typeTypeRef where
+instance : LawfulType noneTypeRef where
+instance : LawfulType strTypeRef where
+instance : LawfulType intTypeRef where
+instance : LawfulType boolTypeRef where
 
 /-! ## TypeSlotsRef -/
 
 /-- A reference to a `TypeSlots` structure. -/
 structure TypeSlotsRef where
   private innerMk ::
-    private innerTy : TypeSpec
+    private innerTy : TypeSpecRef
   deriving Nonempty
 
-noncomputable def TypeSlotsRef.ty (self : TypeSlotsRef) : TypeSpec :=
+noncomputable def TypeSlotsRef.ty (self : TypeSlotsRef) : TypeSpecRef :=
   self.innerTy
 
 theorem TypeSlotsRef.ty_inj : ty a = ty b ↔ a = b := by
   cases a; cases b; simp [ty]
 
-structure DTypeSlotsRef (ty : TypeSpec) extends TypeSlotsRef where
+structure DTypeSlotsRef (ty : TypeSpecRef) extends TypeSlotsRef where
   ty_eq : toTypeSlotsRef.ty = ty := by rfl
 
 attribute [simp] DTypeSlotsRef.ty_eq
@@ -317,7 +117,7 @@ structure Object.Raw where mk ::
   -/
   protected id : ObjectId
   /-- The object's Python type. -/
-  protected ty : TypeSpec
+  protected ty : TypeSpecRef
   /-- The type's slots. Used to optimize magic methods. -/
   innerSlots : TypeSlotsRef
   /-- The object's Lean data. -/
@@ -326,10 +126,10 @@ structure Object.Raw where mk ::
 /-- A Python object. -/
 structure Object extends raw : Object.Raw where mk' ::
   [lawful_ty : LawfulType ty]
-  lawful_none : id = .none → ty = noneType := by simp
-  lawful_bool : id = .false ∨ id = .true → ty = boolType := by simp
+  lawful_none : id = .none → ty = noneTypeRef := by simp
+  lawful_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp
   lawful_slots : innerSlots.ty = ty := by simp
-  lawful_object : ty.IsValidObject id data := by simp
+  lawful_object : ty.data.IsValidObject id data := by simp
 
 instance {self : Object} : LawfulType self.ty := self.lawful_ty
 
@@ -339,12 +139,12 @@ instance {self : Object} : LawfulType self.ty := self.lawful_ty
 A predicate about a type.
 Used to encode Python type relations in Lean types.
 -/
-abbrev TypeProp := TypeSpec → Prop
+abbrev TypeProp := TypeSpecRef → Prop
 
 def TypeProp.Any : TypeProp :=
   fun _ => True
 
-def TypeProp.Subtype (p : TypeProp) (ty : TypeSpec) : TypeProp :=
+def TypeProp.Subtype (p : TypeProp) (ty : TypeSpecRef) : TypeProp :=
   fun t => p t ∧ t ⊆ ty
 
 theorem TypeProp.Subtype.property (h : Subtype p ty t) : p t :=
@@ -354,7 +154,7 @@ theorem TypeProp.Subtype.ty_subset (h : Subtype p ty t) : t ⊆ ty :=
   h.2
 
 theorem TypeProp.Subtype.trans (h : ty₁ ⊆ ty₂) (h₁ : Subtype p ty₁ t) : Subtype p ty₂ t :=
-  ⟨h₁.1, TypeSpec.subset_trans h₁.2 h⟩
+  ⟨h₁.1, .trans h₁.2 h⟩
 
 /-! ## Object Subtypes -/
 
@@ -371,17 +171,17 @@ instance : CoeOut (PObject p) Object :=
   ⟨self, h⟩
 
 /-- An object whose type satisfies `p` and is a subtype of `ty`, -/
-abbrev PSubObject (p : TypeProp) (ty : TypeSpec) :=
+abbrev PSubObject (p : TypeProp) (ty : TypeSpecRef) :=
   PObject (p.Subtype ty)
 
 /--
 An object whose type satisfies `p` and is a subtype of `subTy`,
 which is a subtype of `superTy`.
 -/
-abbrev PSubSubObject (p : TypeProp) (subTy superTy : TypeSpec) :=
+abbrev PSubSubObject (p : TypeProp) (subTy superTy : TypeSpecRef) :=
   PSubObject (p.Subtype subTy) superTy
 
-abbrev SubObject (ty : TypeSpec) := PSubObject .Any ty
+abbrev SubObject (ty : TypeSpecRef) := PSubObject .Any ty
 
 @[inline] def Object.toPObject (self : Object) : PObject .Any :=
   self.cast .intro
@@ -390,22 +190,22 @@ abbrev SubObject (ty : TypeSpec) := PSubObject .Any ty
   self.cast ⟨.intro, h⟩
 
 @[inline] def Object.toSubObject (self : Object) : SubObject self.ty :=
-  self.downcast TypeSpec.subset_rfl
+  self.downcast .rfl
 
 @[inline] def PObject.upcast
   (self : PSubObject p subTy) (h : subTy ⊆ superTy)
 : PSubSubObject p subTy superTy :=
-  self.cast ⟨self.property, TypeSpec.subset_trans self.property.2 h⟩
+  self.cast ⟨self.property, .trans self.property.2 h⟩
 
 theorem PObject.ty_subset {self : PSubObject p ty} : self.ty ⊆ ty :=
-  self.property.2
+  self.property.ty_subset
 
 theorem Object.lawful_subobject
   {self : Object} (h : self.ty ⊆ ty) : ty.IsValidObject self.id self.data
 := self.ty.isValidObject_mro self.lawful_object h
 
 theorem PObject.lawful_subobject
-  {self : PSubObject p ty} : ty.IsValidObject self.id self.data
+  {self : PSubObject p ty} : ty.data.IsValidObject self.id self.data
 := self.toObject.lawful_subobject self.property.ty_subset
 
 /-! `PyM` -/
@@ -435,11 +235,11 @@ namespace Object
 
 def mk
   [TypeName α] (id : ObjectId)
-  (ty : TypeSpec) [LawfulType ty]
+  (ty : TypeSpecRef) [LawfulType ty]
   (slots : DTypeSlotsRef ty) (data : α)
-  (h : ty.IsValidObject id (.mk data) := by simp)
-  (h_none : id = .none → ty = noneType := by simp)
-  (h_bool : id = .false ∨ id = .true → ty = boolType := by simp)
+  (h : ty.data.IsValidObject id (.mk data) := by simp)
+  (h_none : id = .none → ty = noneTypeRef := by simp)
+  (h_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp)
 : Object where
   id; ty
   innerSlots := slots
@@ -482,10 +282,10 @@ structure TypeSlots (α : Type u) where
   deriving Nonempty
 
 /-- Slots compatible with instances of types that satisfy `p`. -/
-abbrev PTypeSlots (p : TypeSpec → Prop) := TypeSlots (PObject p)
+abbrev PTypeSlots (p : TypeProp) := TypeSlots (PObject p)
 
 /-- Slots compatible with instances of `ty` or its subtypes. -/
-abbrev SubTypeSlots (ty : TypeSpec) := TypeSlots (SubObject ty)
+abbrev SubTypeSlots (ty : TypeSpecRef) := TypeSlots (SubObject ty)
 
 @[inline] private unsafe def TypeSlots.castImpl
   (_ : ∀ {ty}, q ty → p ty) (slots : TypeSlots (PObject p))
@@ -510,7 +310,7 @@ def TypeSlots.impCast
 @[inline] def TypeSlots.stripCast
   (h : subTy ⊆ superTy) (slots : TypeSlots (PSubSubObject p subTy superTy))
 : TypeSlots (PSubObject p subTy) :=
-  slots.impCast (fun hp => ⟨hp, TypeSpec.subset_trans hp.ty_subset h⟩)
+  slots.impCast (fun hp => ⟨hp, .trans hp.ty_subset h⟩)
 
 @[inline] def TypeSlots.eqCast
   (h : ty₁ = ty₂)  (slots : TypeSlots (SubObject ty₁)) : TypeSlots (SubObject ty₂)
@@ -558,7 +358,7 @@ opaque TypeSlotsRef.get
 /-! ## `object` -/
 
 /- An instance of a subclass of `object` that satisfies `p`. -/
-abbrev PObjectObject (p : TypeProp) := PObject (p.Subtype objectType)
+abbrev PObjectObject (p : TypeProp) := PObject (p.Subtype objectTypeRef)
 
 /--
 An instance of `object` or one of its subtypes interpreted as an `object`.
@@ -621,11 +421,11 @@ def objectTypeSlots : TypeSlots ObjectObject where
   bool _ := return true
   repr self := return self.repr
 
-initialize objectTypeSlotsRef : DTypeSlotsRef objectType ←
+initialize objectTypeSlotsRef : DTypeSlotsRef objectTypeRef ←
   objectTypeSlots.mkRef
 
 def ObjectObject.ofVoidRef (ref : VoidRef) : ObjectObject :=
-  Object.mk ref.id objectType objectTypeSlotsRef ref |>.toSubObject
+  Object.mk ref.id objectTypeRef objectTypeSlotsRef ref |>.toSubObject
 
 def mkObjectObject : BaseIO ObjectObject := do
   ObjectObject.ofVoidRef <$> mkVoidRef
@@ -633,7 +433,7 @@ def mkObjectObject : BaseIO ObjectObject := do
 /-! ## `type` -/
 
 /- An instance of a subclass of `type` that satisfies `p`. -/
-abbrev PTypeObject (p : TypeProp) := PSubObject p typeType
+abbrev PTypeObject (p : TypeProp) := PSubObject p typeTypeRef
 
 /- An instance of `type` or one of its subtypes. -/
 def TypeObject := PTypeObject .Any
@@ -661,7 +461,7 @@ theorem isType_toObject (self : TypeObject) : self.toObject.isType :=
   self.ty.isTypeSubclass_iff_subset.mpr self.ty_subset
 
 @[inline] def getTypeSpecRef (self : TypeObject) : TypeSpecRef :=
-  self.getData (self.lawful_subobject).2
+  self.getData (self.lawful_subobject : typeType.IsValidObject _ _).2
 
 @[inline] def getTypeSpec (self : TypeObject) : TypeSpec :=
   self.getTypeSpecRef.data
@@ -681,17 +481,21 @@ def typeTypeSlots : TypeSlots TypeObject where
   bool _ := return true
   repr self := return self.repr
 
-initialize typeTypeSlotsRef : DTypeSlotsRef typeType ←
+initialize typeTypeSlotsRef : DTypeSlotsRef typeTypeRef ←
   typeTypeSlots.mkRef
 
-def mkTypeObject (spec : TypeSpec) : BaseIO Object := do
-  let ref ← mkTypeSpecRef spec
-  return .mk ref.id typeType typeTypeSlotsRef ref
+def TypeObject.ofDTypeSpecRef (ref : DTypeSpecRef ty) : TypeObject :=
+  Object.mk ref.id typeTypeRef typeTypeSlotsRef ref.toTypeSpecRef |>.toSubObject
+
+instance : CoeOut (DTypeSpecRef ty) TypeObject := ⟨TypeObject.ofDTypeSpecRef⟩
+
+def mkTypeObject (spec : TypeSpec) : BaseIO TypeObject := do
+  .ofDTypeSpecRef <$> mkDTypeSpecRef spec
 
 /-! ## None -/
 
 /- An instance of type `none`. There is only one, `None`. -/
-def NoneObject := SubObject noneType
+def NoneObject := SubObject noneTypeRef
 
 /--
 Returns whether this object is the constant `None`.
@@ -721,20 +525,20 @@ protected def repr : String :=
 
 end NoneObject
 
-def noneTypeSlots : SubTypeSlots noneType where
+def noneTypeSlots : TypeSlots NoneObject where
   hash _ := return NoneObject.hash
   beq _ other := return other.isNone
   bne _ other := return other.isNotNone
   bool _ := return false
   repr _ := return NoneObject.repr
 
-initialize noneTypeSlotsRef : DTypeSlotsRef noneType ←
+initialize noneTypeSlotsRef : DTypeSlotsRef noneTypeRef ←
   noneTypeSlots.mkRef
 
 namespace Object
 
 protected def none : NoneObject :=
-  Object.mk .none noneType noneTypeSlotsRef () |>.toSubObject
+  Object.mk .none noneTypeRef noneTypeSlotsRef () |>.toSubObject
 
 instance : CoeDep (Option α) none Object := ⟨Object.none⟩
 instance : CoeDep (Option α) none NoneObject := ⟨Object.none⟩
@@ -742,7 +546,7 @@ instance : CoeDep (Option α) none NoneObject := ⟨Object.none⟩
 @[simp] theorem isNone_none : isNone none := rfl
 
 @[simp] theorem id_none : (none : Object).id = .none := rfl
-@[simp] theorem ty_none : (none : Object).ty = noneType := rfl
+@[simp] theorem ty_none : (none : Object).ty = noneTypeRef := rfl
 @[simp] theorem data_none : (none : Object).data = .mk () := rfl
 
 theorem isNone_iff_eq_none : isNone self ↔ self = none := by
@@ -799,7 +603,7 @@ where
     Lean.isLetterLike c
 
 /- An instance of a subclass of `str` that satisfies `p`. -/
-abbrev PStrObject (p : TypeProp) := PSubObject p strType
+abbrev PStrObject (p : TypeProp) := PSubObject p strTypeRef
 
 /- An instance of a subclass of `str`. -/
 def StrObject := PStrObject .Any
@@ -863,11 +667,11 @@ def strTypeSlots : TypeSlots StrObject where
   str self := return self.toString
   repr self := return self.repr
 
-initialize strTypeSlotsRef : DTypeSlotsRef strType ←
+initialize strTypeSlotsRef : DTypeSlotsRef strTypeRef ←
   strTypeSlots.mkRef
 
 @[inline] def StrObject.ofStringRef (r : StringRef) : StrObject :=
-  Object.mk r.id strType strTypeSlotsRef r |>.toSubObject
+  Object.mk r.id strTypeRef strTypeSlotsRef r |>.toSubObject
 
 @[inline] def mkStrObject (s : String) : BaseIO StrObject := do
   StrObject.ofStringRef <$> mkStringRef s
@@ -875,10 +679,10 @@ initialize strTypeSlotsRef : DTypeSlotsRef strType ←
 /-! ## `int` Objects -/
 
 /- An instance of a subtype of `int` that satisfies `p`. -/
-def PIntObject (p : TypeProp) := PSubObject p intType
+def PIntObject (p : TypeProp) := PSubObject p intTypeRef
 
 /- An instance of the type `ty` that satisfies `p` and subclasses `int` . -/
-abbrev PSubIntObject (p : TypeProp) (ty : TypeSpec) := PIntObject (p.Subtype ty)
+abbrev PSubIntObject (p : TypeProp) (ty : TypeSpecRef) := PIntObject (p.Subtype ty)
 
 /- An instance of a subclass of `int`. -/
 abbrev IntObject := PIntObject .Any
@@ -886,7 +690,7 @@ abbrev IntObject := PIntObject .Any
 @[inline] def Object.isInt (self : Object) : Bool :=
   self.ty.isIntSubclass
 
-theorem Object.isInt_iff_subset : isInt self ↔ self.ty ⊆ intType :=
+theorem Object.isInt_iff_subset : isInt self ↔ self.ty ⊆ intTypeRef :=
   self.ty.isIntSubclass_iff_subset
 
 @[inline] def Object.asInt (self : Object) (h : self.isInt) : IntObject :=
@@ -899,7 +703,7 @@ namespace PIntObject
 
 instance : CoeOut (PIntObject p) Object := ⟨PObject.toObject⟩
 
-theorem ty_subset_intType {self : PIntObject p} : self.ty ⊆ intType :=
+theorem ty_subset_intType {self : PIntObject p} : self.ty ⊆ intTypeRef :=
   self.property.2
 
 theorem isInt_toObject (self : PIntObject p) : self.toObject.isInt :=
@@ -935,11 +739,11 @@ def intTypeSlots : TypeSlots IntObject where
   bool self := return self.toBool
   repr self := return self.repr
 
-initialize intTypeSlotsRef : DTypeSlotsRef intType ←
+initialize intTypeSlotsRef : DTypeSlotsRef intTypeRef ←
   intTypeSlots.mkRef
 
 @[inline] def IntObject.ofIntRef (n : IntRef) : IntObject :=
-  Object.mk n.id intType intTypeSlotsRef n |>.toSubObject
+  Object.mk n.id intTypeRef intTypeSlotsRef n |>.toSubObject
 
 instance : OfNat IntObject 0 := ⟨.ofIntRef 0⟩
 instance : Coe IntRef IntObject := ⟨.ofIntRef⟩
@@ -953,19 +757,19 @@ instance : OfNat Object 0 := ⟨(0 : IntObject)⟩
 
 /-! ## `bool` Objects -/
 
-@[simp] theorem boolType_subset_intType : boolType ⊆ intType := by
-  simp [boolType, TypeSpec.subset_iff_mem_mro, TypeSpec.mro]
+@[simp] theorem boolTypeRef_subset_intTypeRef : boolTypeRef ⊆ intTypeRef := by
+  simp [TypeSpecRef.subset_iff_eq_or_mem_baseMro]
 
 /-- An instance of a subclass of `bool` that satisfies `p`. -/
-def PBoolObject (p : TypeProp) := PSubIntObject p boolType
+def PBoolObject (p : TypeProp) := PSubIntObject p boolTypeRef
 
 /-- An instance of a subclass of `bool`. There are only two, `True` and `False`. -/
 abbrev BoolObject := PBoolObject .Any
 
-@[inline] def BoolObject.ofSubObject (self : SubObject boolType) : BoolObject :=
-  self.upcast boolType_subset_intType
+@[inline] def BoolObject.ofSubObject (self : SubObject boolTypeRef) : BoolObject :=
+  self.upcast boolTypeRef_subset_intTypeRef
 
-instance : Coe (SubObject boolType) BoolObject := ⟨.ofSubObject⟩
+instance : Coe (SubObject boolTypeRef) BoolObject := ⟨.ofSubObject⟩
 
 /--
 Returns whether this object is the `True` singleton.
@@ -991,12 +795,12 @@ This is equivalent to the Python `self is True or self is False`.
 @[inline] def Object.isBool (self : Object) : Bool :=
   self.isFalse || self.isTrue
 
-theorem Object.ty_eq_of_isBool : isBool self → self.ty = boolType := by
+theorem Object.ty_eq_of_isBool : isBool self → self.ty = boolTypeRef := by
   simp only [isBool, isTrue, isFalse, Bool.or_eq_true, beq_iff_eq]
   intro h
   exact self.lawful_bool h
 
-theorem Object.isBool_iff_subset : isBool self ↔ self.ty ⊆ boolType := by
+theorem Object.isBool_iff_subset : isBool self ↔ self.ty ⊆ boolTypeRef := by
   apply Iff.intro
   · intro h
     simp [ty_eq_of_isBool h]
@@ -1027,23 +831,23 @@ def repr (self : BoolObject) : String :=
 end BoolObject
 
 def boolTypeSlots : TypeSlots BoolObject := {
-  intTypeSlots.downcast boolType_subset_intType with
+  intTypeSlots.downcast boolTypeRef_subset_intTypeRef with
   str self := return self.repr
   repr self := return self.repr
 }
 
-initialize boolTypeSlotsRef : DTypeSlotsRef boolType ←
-  boolTypeSlots.stripCast boolType_subset_intType |>.mkRef
+initialize boolTypeSlotsRef : DTypeSlotsRef boolTypeRef ←
+  boolTypeSlots.stripCast boolTypeRef_subset_intTypeRef |>.mkRef
 
 namespace BoolObject
 
 protected def false : BoolObject := .ofSubObject <|
-  Object.mk .false boolType boolTypeSlotsRef (0 : IntRef) |>.toSubObject
+  Object.mk .false boolTypeRef boolTypeSlotsRef (0 : IntRef) |>.toSubObject
 
 instance : CoeDep Bool false BoolObject := ⟨BoolObject.false⟩
 
 protected def true : BoolObject := .ofSubObject <|
-  Object.mk .true boolType boolTypeSlotsRef (1 : IntRef) |>.toSubObject
+  Object.mk .true boolTypeRef boolTypeSlotsRef (1 : IntRef) |>.toSubObject
 
 instance : CoeDep Bool true BoolObject := ⟨BoolObject.true⟩
 
@@ -1057,7 +861,7 @@ end BoolObject
 namespace Object
 
 @[simp] theorem id_true : (true : Object).id = .true := rfl
-@[simp] theorem ty_true : (true : Object).ty = boolType := rfl
+@[simp] theorem ty_true : (true : Object).ty = boolTypeRef := rfl
 @[simp] theorem data_true : (true : Object).data = .mk (1 : IntRef) := rfl
 
 theorem isTrue_iff_eq_true : isTrue self ↔ self = true := by
@@ -1068,7 +872,7 @@ theorem isTrue_iff_eq_true : isTrue self ↔ self = true := by
   simp [ty_eq, data_eq]
 
 @[simp] theorem id_false : (false : Object).id = .false := rfl
-@[simp] theorem ty_false : (false : Object).ty = boolType := rfl
+@[simp] theorem ty_false : (false : Object).ty = boolTypeRef := rfl
 @[simp] theorem data_false : (false : Object).data = .mk (0 : IntRef) := rfl
 
 theorem isFalse_iff_eq_false : isFalse self ↔ self = false := by
@@ -1079,3 +883,4 @@ theorem isFalse_iff_eq_false : isFalse self ↔ self = false := by
   simp [ty_eq, data_eq]
 
 end Object
+---/

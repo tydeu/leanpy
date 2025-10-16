@@ -22,16 +22,16 @@ scalar value is used. For big integers and other objects with a non-scalar
 Lean representation, their address is used.
 -/
 structure ObjectId where
-  private mk ::
-    private val : UInt64
+  private innerMk ::
+    private innerVal : UInt64
   deriving Nonempty, DecidableEq, Hashable
 
 namespace ObjectId
 
 def toNat (self : ObjectId) : Nat :=
-  self.val.toNat
+  self.innerVal.toNat
 
-@[simp] theorem toNat_mk : toNat (mk n) = n.toNat := rfl
+@[simp] private theorem toNat_mk : toNat (innerMk n) = n.toNat := rfl
 
 theorem toNat.inj : toNat n = toNat m → n = m := by
   cases n; cases m; simp [toNat, UInt64.toNat_inj]
@@ -40,7 +40,7 @@ theorem toNat_inj : toNat n = toNat m ↔ n = m :=
   .intro toNat.inj (congrArg toNat)
 
 @[inline] def hex (self : ObjectId) : String :=
-  upperHexUInt64 self.val
+  upperHexUInt64 self.innerVal
 
 instance : ToString ObjectId := ⟨ObjectId.hex⟩
 
