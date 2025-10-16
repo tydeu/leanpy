@@ -14,30 +14,30 @@ namespace LeanPy
 
 /-! ## LawfulType -/
 
-class LawfulType (self : TypeSpecRef) : Prop where
+class LawfulType (self : TypeRef) : Prop where
   isNonScalar_addr : self.addr % 2 = 0 := by simp
   subset_objectType : self ⊆ objectTypeRef := by
-    simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
+    simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
   isTypeSubclass_iff_subset :
     self.isTypeSubclass ↔ self ⊆ typeTypeRef := by
-      simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
+      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
   isIntSubclass_iff_subset :
     self.isIntSubclass ↔ self ⊆ intTypeRef := by
-      simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
+      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
   isStrSubclass_iff_subset :
     self.isStrSubclass ↔ self ⊆ strTypeRef := by
-      simp [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, FrozenRef.eq_iff]
+      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, FrozenRef.eq_iff]
   isValidObject_mro : ∀ {id data},
     self.IsValidObject id data → ∀ {ty}, self ⊆ ty → ty.IsValidObject id data
-  := by simp_all [TypeSpecRef.subset_iff_mem_mro, TypeSpecRef.mro_def, TypeSpecRef.mro.go]
+  := by simp_all [TypeRef.subset_iff_mem_mro, TypeRef.mro_def, TypeRef.mro.go]
 
-namespace TypeSpecRef
+namespace TypeRef
 export LawfulType (
   subset_objectType
   isTypeSubclass_iff_subset isIntSubclass_iff_subset isStrSubclass_iff_subset
   isValidObject_mro
 )
-end TypeSpecRef
+end TypeRef
 
 @[simp] theorem data_objectTypeRef : objectTypeRef.data = objectType := rfl
 
@@ -87,16 +87,16 @@ instance : LawfulType boolTypeRef where
 /-- A reference to a `TypeSlots` structure. -/
 structure TypeSlotsRef where
   private innerMk ::
-    private innerTy : TypeSpecRef
+    private innerTy : TypeRef
   deriving Nonempty
 
-noncomputable def TypeSlotsRef.ty (self : TypeSlotsRef) : TypeSpecRef :=
+noncomputable def TypeSlotsRef.ty (self : TypeSlotsRef) : TypeRef :=
   self.innerTy
 
 theorem TypeSlotsRef.ty_inj : ty a = ty b ↔ a = b := by
   cases a; cases b; simp [ty]
 
-structure DTypeSlotsRef (ty : TypeSpecRef) extends TypeSlotsRef where
+structure DTypeSlotsRef (ty : TypeRef) extends TypeSlotsRef where
   ty_eq : toTypeSlotsRef.ty = ty := by rfl
 
 attribute [simp] DTypeSlotsRef.ty_eq
@@ -117,7 +117,7 @@ structure Object.Raw where mk ::
   -/
   protected id : ObjectId
   /-- The object's Python type. -/
-  protected ty : TypeSpecRef
+  protected ty : TypeRef
   /-- The type's slots. Used to optimize magic methods. -/
   innerSlots : TypeSlotsRef
   /-- The object's Lean data. -/
@@ -139,12 +139,12 @@ instance {self : Object} : LawfulType self.ty := self.lawful_ty
 A predicate about a type.
 Used to encode Python type relations in Lean types.
 -/
-abbrev TypeProp := TypeSpecRef → Prop
+abbrev TypeProp := TypeRef → Prop
 
 def TypeProp.Any : TypeProp :=
   fun _ => True
 
-def TypeProp.Subtype (p : TypeProp) (ty : TypeSpecRef) : TypeProp :=
+def TypeProp.Subtype (p : TypeProp) (ty : TypeRef) : TypeProp :=
   fun t => p t ∧ t ⊆ ty
 
 theorem TypeProp.Subtype.property (h : Subtype p ty t) : p t :=
@@ -171,17 +171,17 @@ instance : CoeOut (PObject p) Object :=
   ⟨self, h⟩
 
 /-- An object whose type satisfies `p` and is a subtype of `ty`, -/
-abbrev PSubObject (p : TypeProp) (ty : TypeSpecRef) :=
+abbrev PSubObject (p : TypeProp) (ty : TypeRef) :=
   PObject (p.Subtype ty)
 
 /--
 An object whose type satisfies `p` and is a subtype of `subTy`,
 which is a subtype of `superTy`.
 -/
-abbrev PSubSubObject (p : TypeProp) (subTy superTy : TypeSpecRef) :=
+abbrev PSubSubObject (p : TypeProp) (subTy superTy : TypeRef) :=
   PSubObject (p.Subtype subTy) superTy
 
-abbrev SubObject (ty : TypeSpecRef) := PSubObject .Any ty
+abbrev SubObject (ty : TypeRef) := PSubObject .Any ty
 
 @[inline] def Object.toPObject (self : Object) : PObject .Any :=
   self.cast .intro
@@ -235,7 +235,7 @@ namespace Object
 
 def mk
   [TypeName α] (id : ObjectId)
-  (ty : TypeSpecRef) [LawfulType ty]
+  (ty : TypeRef) [LawfulType ty]
   (slots : DTypeSlotsRef ty) (data : α)
   (h : ty.data.IsValidObject id (.mk data) := by simp)
   (h_none : id = .none → ty = noneTypeRef := by simp)
@@ -285,7 +285,7 @@ structure TypeSlots (α : Type u) where
 abbrev PTypeSlots (p : TypeProp) := TypeSlots (PObject p)
 
 /-- Slots compatible with instances of `ty` or its subtypes. -/
-abbrev SubTypeSlots (ty : TypeSpecRef) := TypeSlots (SubObject ty)
+abbrev SubTypeSlots (ty : TypeRef) := TypeSlots (SubObject ty)
 
 @[inline] private unsafe def TypeSlots.castImpl
   (_ : ∀ {ty}, q ty → p ty) (slots : TypeSlots (PObject p))
@@ -460,14 +460,14 @@ instance : Coe TypeObject Object := ⟨PObject.toObject⟩
 theorem isType_toObject (self : TypeObject) : self.toObject.isType :=
   self.ty.isTypeSubclass_iff_subset.mpr self.ty_subset
 
-@[inline] def getTypeSpecRef (self : TypeObject) : TypeSpecRef :=
+@[inline] def getTypeRef (self : TypeObject) : TypeRef :=
   self.getData (self.lawful_subobject : typeType.IsValidObject _ _).2
 
-@[inline] def getTypeSpec (self : TypeObject) : TypeSpec :=
-  self.getTypeSpecRef.data
+@[inline] def getType (self : TypeObject) : PyType :=
+  self.getTypeRef.data
 
 def name (self : TypeObject) : String :=
-  self.getTypeSpec.name
+  self.getType.name
 
 def repr (self : TypeObject) : String :=
   s!"<class '{self.name}'>"
@@ -484,13 +484,13 @@ def typeTypeSlots : TypeSlots TypeObject where
 initialize typeTypeSlotsRef : DTypeSlotsRef typeTypeRef ←
   typeTypeSlots.mkRef
 
-def TypeObject.ofDTypeSpecRef (ref : DTypeSpecRef ty) : TypeObject :=
-  Object.mk ref.id typeTypeRef typeTypeSlotsRef ref.toTypeSpecRef |>.toSubObject
+def TypeObject.ofDTypeRef (ref : DTypeRef ty) : TypeObject :=
+  Object.mk ref.id typeTypeRef typeTypeSlotsRef ref.toTypeRef |>.toSubObject
 
-instance : CoeOut (DTypeSpecRef ty) TypeObject := ⟨TypeObject.ofDTypeSpecRef⟩
+instance : CoeOut (DTypeRef ty) TypeObject := ⟨TypeObject.ofDTypeRef⟩
 
-def mkTypeObject (spec : TypeSpec) : BaseIO TypeObject := do
-  .ofDTypeSpecRef <$> mkDTypeSpecRef spec
+def mkTypeObject (ty : PyType) : BaseIO TypeObject := do
+  .ofDTypeRef <$> mkDTypeRef ty
 
 /-! ## None -/
 
@@ -682,7 +682,7 @@ initialize strTypeSlotsRef : DTypeSlotsRef strTypeRef ←
 def PIntObject (p : TypeProp) := PSubObject p intTypeRef
 
 /- An instance of the type `ty` that satisfies `p` and subclasses `int` . -/
-abbrev PSubIntObject (p : TypeProp) (ty : TypeSpecRef) := PIntObject (p.Subtype ty)
+abbrev PSubIntObject (p : TypeProp) (ty : TypeRef) := PIntObject (p.Subtype ty)
 
 /- An instance of a subclass of `int`. -/
 abbrev IntObject := PIntObject .Any
@@ -758,7 +758,7 @@ instance : OfNat Object 0 := ⟨(0 : IntObject)⟩
 /-! ## `bool` Objects -/
 
 @[simp] theorem boolTypeRef_subset_intTypeRef : boolTypeRef ⊆ intTypeRef := by
-  simp [TypeSpecRef.subset_iff_eq_or_mem_baseMro]
+  simp [TypeRef.subset_iff_eq_or_mem_baseMro]
 
 /-- An instance of a subclass of `bool` that satisfies `p`. -/
 def PBoolObject (p : TypeProp) := PSubIntObject p boolTypeRef

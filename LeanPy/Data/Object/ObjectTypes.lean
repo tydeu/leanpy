@@ -17,15 +17,15 @@ namespace LeanPy
 
 /-! ## `NoneType` -/
 
-@[reducible] def noneType : TypeSpec where
+@[reducible] def noneType : PyType where
   name := "NoneType"
   base? := some objectTypeRef
   IsValidObject id data :=
     id = .none ∧ data = .mk ()
 
-initialize noneTypeRef' : DTypeSpecRef noneType ← mkDTypeSpecRef _
+initialize noneTypeRef' : DTypeRef noneType ← mkDTypeRef _
 
-abbrev noneTypeRef : TypeSpecRef := noneTypeRef'.toTypeSpecRef
+abbrev noneTypeRef : TypeRef := noneTypeRef'.toTypeRef
 
 /-! ## `type` -/
 
@@ -34,17 +34,17 @@ def typeTypeDoc : String := "\
   type(name, bases, dict, **kwds) -> a new type\
   "
 
-@[reducible] def typeType : TypeSpec where
+@[reducible] def typeType : PyType where
   name := "type"
   doc? := some typeTypeDoc
   isTypeSubclass := true
   base? := some objectTypeRef
   IsValidObject id data :=
-    id.isNonScalar ∧ data.kind = typeName TypeSpecRef
+    id.isNonScalar ∧ data.kind = typeName TypeRef
 
-initialize typeTypeRef' : DTypeSpecRef typeType ← mkDTypeSpecRef _
+initialize typeTypeRef' : DTypeRef typeType ← mkDTypeRef _
 
-abbrev typeTypeRef : TypeSpecRef := typeTypeRef'.toTypeSpecRef
+abbrev typeTypeRef : TypeRef := typeTypeRef'.toTypeRef
 
 /-! ## `str` -/
 
@@ -61,7 +61,7 @@ def strTypeDoc : String := "\
   errors defaults to 'strict'.\
   "
 
-@[reducible] def strType : TypeSpec where
+@[reducible] def strType : PyType where
   name := "str"
   doc? := some strTypeDoc
   isStrSubclass := true
@@ -69,9 +69,9 @@ def strTypeDoc : String := "\
   IsValidObject id data :=
     id.isNonScalar ∧ data.kind = typeName StringRef
 
-initialize strTypeRef' : DTypeSpecRef strType ← mkDTypeSpecRef _
+initialize strTypeRef' : DTypeRef strType ← mkDTypeRef _
 
-abbrev strTypeRef : TypeSpecRef := strTypeRef'.toTypeSpecRef
+abbrev strTypeRef : TypeRef := strTypeRef'.toTypeRef
 
 /-! ## `int` -/
 
@@ -92,7 +92,7 @@ def intTypeDoc : String := "\
   4\
   "
 
-@[reducible] def intType : TypeSpec where
+@[reducible] def intType : PyType where
   name := "int"
   doc? := some intTypeDoc
   isIntSubclass := true
@@ -100,6 +100,6 @@ def intTypeDoc : String := "\
   IsValidObject _ data :=
     data.kind = typeName IntRef -- TODO: id.isInt
 
-initialize intTypeRef' : DTypeSpecRef intType ← mkDTypeSpecRef _
+initialize intTypeRef' : DTypeRef intType ← mkDTypeRef _
 
-abbrev intTypeRef : TypeSpecRef := intTypeRef'.toTypeSpecRef
+abbrev intTypeRef : TypeRef := intTypeRef'.toTypeRef

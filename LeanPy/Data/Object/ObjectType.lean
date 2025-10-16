@@ -14,10 +14,10 @@ def objectTypeDoc : String := "\
   instance that has no instance attributes and cannot be given any.\n\
   "
 
-@[reducible] def objectType : TypeSpec where
+@[reducible] def objectType : PyType where
   name := "object"
   doc? := some objectTypeDoc
 
-initialize objectTypeRef' : DTypeSpecRef objectType ← mkDTypeSpecRef _
+initialize objectTypeRef' : DTypeRef objectType ← mkDTypeRef _
 
-abbrev objectTypeRef : TypeSpecRef := objectTypeRef'.toTypeSpecRef
+abbrev objectTypeRef : TypeRef := objectTypeRef'.toTypeRef

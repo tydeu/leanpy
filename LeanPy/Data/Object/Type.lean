@@ -11,13 +11,14 @@ namespace LeanPy
 /-! ## Object Type -/
 
 /-- A Python type. -/
-structure TypeSpec where
+-- The `Py` prefix to avoids a clash with the Lean `Type` keyword.
+structure PyType where
   /-- The type's name -/
   name : String
   /-- The type's documentation string or `none` if undefined. -/
   doc? : Option String := none
   /-- The type's parent. -/
-  base? : Option (FrozenRef TypeSpec) := none
+  base? : Option (FrozenRef PyType) := none
   /--
   Is this type is a legal base for other types.
   If `false`, this type cannot be legally subtyped.
@@ -52,15 +53,15 @@ structure TypeSpec where
   IsValidObject (id : ObjectId) (data : ObjectData) : Prop := True
   deriving Nonempty
 
-namespace TypeSpec
+namespace PyType
 
 /-- The type's method resolution order. -/
-@[inline] def mro (self : TypeSpec) : List TypeSpec :=
+@[inline] def mro (self : PyType) : List PyType :=
   self :: match self with
     | {base? := none, ..} => []
     | {base? := some base, ..} => mro base.data
 
-@[inline] def baseMro (self : TypeSpec) : List TypeSpec :=
+@[inline] def baseMro (self : PyType) : List PyType :=
   match self with
   | {base? := none, ..} => []
   | {base? := some base, ..} => mro base.data
@@ -99,48 +100,48 @@ private theorem mem_mro_trans :
     | inl h₂ => simpa [h₂, mro] using h₁
     | inr h₂ => exact Or.inr <| mem_mro_trans h₁ h₂
 
-def IsSubtype (self other : TypeSpec) : Prop :=
+def IsSubtype (self other : PyType) : Prop :=
   other ∈ self.mro
 
-instance : HasSubset TypeSpec := ⟨TypeSpec.IsSubtype⟩
+instance : HasSubset PyType := ⟨PyType.IsSubtype⟩
 
 theorem subset_iff_mem_mro : a ⊆ b ↔ b ∈ mro a := Iff.rfl
 
-@[simp] theorem subset_rfl {self : TypeSpec} : self ⊆ self :=  self_mem_mro
+@[simp] theorem subset_rfl {self : PyType} : self ⊆ self :=  self_mem_mro
 
-theorem subset_trans {a b c : TypeSpec} : a ⊆ b → b ⊆ c → a ⊆ c  := by
+theorem subset_trans {a b c : PyType} : a ⊆ b → b ⊆ c → a ⊆ c  := by
   simp only [subset_iff_mem_mro]
   exact fun h₁ h₂ => mem_mro_trans h₂ h₁
 
-end TypeSpec
+end PyType
 
 /-! ## Object Type Ref -/
 
-abbrev TypeSpecRef := FrozenRef TypeSpec
+abbrev TypeRef := FrozenRef PyType
 
-noncomputable instance : SizeOf TypeSpecRef :=
-  inferInstanceAs (SizeOf (FrozenRef TypeSpec))
+noncomputable instance : SizeOf TypeRef :=
+  inferInstanceAs (SizeOf (FrozenRef PyType))
 
-namespace TypeSpecRef
+namespace TypeRef
 
-instance : TypeName TypeSpecRef := unsafe (.mk _ ``TypeSpecRef)
+instance : TypeName TypeRef := unsafe (.mk _ ``TypeRef)
 
 /-- The type's method resolution order. -/
-@[inline] def mro (self : TypeSpecRef) : List TypeSpecRef :=
+@[inline] def mro (self : TypeRef) : List TypeRef :=
   self :: go self.data
 where go self :=
   match self with
   | {base? := none, ..} => []
   | {base? := some base, ..} => mro base
 
-@[inline] def baseMro (self : TypeSpecRef) : List TypeSpecRef :=
+@[inline] def baseMro (self : TypeRef) : List TypeRef :=
   match self.data with
   | {base? := none, ..} => []
   | {base? := some base, ..} => mro base
 
-instance : SizeOf TypeSpecRef := ⟨(·.baseMro.length)⟩
+instance : SizeOf TypeRef := ⟨(·.baseMro.length)⟩
 
-@[simp] theorem sizeOf_def {self : TypeSpecRef} :
+@[simp] theorem sizeOf_def {self : TypeRef} :
   sizeOf self = self.baseMro.length
 := rfl
 
@@ -184,77 +185,77 @@ private theorem sup_mem_sub :
 termination_by sub
 decreasing_by simp [sub_baseMro]
 
-def Subtype (self other : TypeSpecRef) : Prop :=
+def Subtype (self other : TypeRef) : Prop :=
   other ∈ self.mro
 
-instance : HasSubset TypeSpecRef := ⟨TypeSpecRef.Subtype⟩
+instance : HasSubset TypeRef := ⟨TypeRef.Subtype⟩
 
 theorem subset_iff_mem_mro : a ⊆ b ↔ b ∈ mro a := Iff.rfl
 
 theorem subset_iff_eq_or_mem_baseMro : a ⊆ b ↔ (a = b ∨ b ∈ baseMro a) := by
   grind [subset_iff_mem_mro, mro_def]
 
-@[simp] theorem Subtype.rfl {self : TypeSpecRef} : self ⊆ self := self_mem_mro
+@[simp] theorem Subtype.rfl {self : TypeRef} : self ⊆ self := self_mem_mro
 
-@[simp] theorem Subtype.refl (self : TypeSpecRef) : self ⊆ self := self_mem_mro
+@[simp] theorem Subtype.refl (self : TypeRef) : self ⊆ self := self_mem_mro
 
-theorem Subtype.trans {a b c : TypeSpecRef} : a ⊆ b → b ⊆ c → a ⊆ c  := by
+theorem Subtype.trans {a b c : TypeRef} : a ⊆ b → b ⊆ c → a ⊆ c  := by
   simp only [subset_iff_mem_mro]
   exact fun h₁ h₂ => sup_mem_sub h₁ h₂
 
-instance : Trans (Subset : TypeSpecRef → TypeSpecRef → Prop) Subset Subset :=
+instance : Trans (Subset : TypeRef → TypeRef → Prop) Subset Subset :=
   ⟨Subtype.trans⟩
 
-@[inherit_doc TypeSpec.name]
-abbrev name (self : TypeSpecRef) : String :=
+@[inherit_doc PyType.name]
+abbrev name (self : TypeRef) : String :=
   self.data.name
 
-@[simp, inherit_doc TypeSpec.isTypeSubclass]
-abbrev isTypeSubclass (self : TypeSpecRef) : Bool :=
+@[simp, inherit_doc PyType.isTypeSubclass]
+abbrev isTypeSubclass (self : TypeRef) : Bool :=
   self.data.isTypeSubclass
 
-@[simp, inherit_doc TypeSpec.isIntSubclass]
-abbrev isIntSubclass (self : TypeSpecRef) : Bool :=
+@[simp, inherit_doc PyType.isIntSubclass]
+abbrev isIntSubclass (self : TypeRef) : Bool :=
   self.data.isIntSubclass
 
-@[simp, inherit_doc TypeSpec.isStrSubclass]
-abbrev isStrSubclass (self : TypeSpecRef) : Bool :=
+@[simp, inherit_doc PyType.isStrSubclass]
+abbrev isStrSubclass (self : TypeRef) : Bool :=
   self.data.isStrSubclass
 
-@[simp, inherit_doc TypeSpec.IsValidObject]
-abbrev IsValidObject (self : TypeSpecRef) (id : ObjectId) (data : ObjectData) : Prop :=
+@[simp, inherit_doc PyType.IsValidObject]
+abbrev IsValidObject (self : TypeRef) (id : ObjectId) (data : ObjectData) : Prop :=
   self.data.IsValidObject id data
 
-end TypeSpecRef
+end TypeRef
 
-structure DTypeSpecRef (ty : TypeSpec) extends NonScalarRef TypeSpec where
+structure DTypeRef (ty : PyType) extends NonScalarRef PyType where
   data_eq : toNonScalarRef.data = ty
 
-namespace DTypeSpecRef
+namespace DTypeRef
 
 attribute [simp] data_eq
 
-instance : Nonempty (DTypeSpecRef ty) := ⟨⟨.null ty, rfl⟩⟩
+instance : Nonempty (DTypeRef ty) := ⟨⟨.null ty, rfl⟩⟩
 
-@[inline] def toTypeSpecRef (self : DTypeSpecRef ty) : TypeSpecRef :=
+@[inline] def toTypeRef (self : DTypeRef ty) : TypeRef :=
   self.toFrozenRef.cast self.data_eq
 
-@[simp] theorem isNonScalar_addr_toTypeSpecRef {self : DTypeSpecRef ty} :
-  self.toTypeSpecRef.addr % 2 = 0
+@[simp] theorem isNonScalar_addr_toTypeRef {self : DTypeRef ty} :
+  self.toTypeRef.addr % 2 = 0
 := self.addr_mod_two
 
-end DTypeSpecRef
+end DTypeRef
 
-instance : CoeOut (DTypeSpecRef ty) TypeSpecRef :=
-  ⟨DTypeSpecRef.toTypeSpecRef⟩
+instance : CoeOut (DTypeRef ty) TypeRef :=
+  ⟨DTypeRef.toTypeRef⟩
 
-@[inline] private unsafe def mkTypeSpecRefImpl
-  (ty : TypeSpec) : BaseIO (DTypeSpecRef ty)
+@[inline] private unsafe def mkTypeRefImpl
+  (ty : PyType) : BaseIO (DTypeRef ty)
 := pure (unsafeCast ty)
 
-@[implemented_by mkTypeSpecRefImpl]
-opaque mkDTypeSpecRef (ty : TypeSpec) : BaseIO (DTypeSpecRef ty) :=
+@[implemented_by mkTypeRefImpl]
+opaque mkDTypeRef (ty : PyType) : BaseIO (DTypeRef ty) :=
   pure ⟨NonScalarRef.null ty, NonScalarRef.data_null⟩
 
-@[inline] def mkTypeSpecRef (ty : TypeSpec) : BaseIO TypeSpecRef := do
-  (·.toTypeSpecRef) <$> mkDTypeSpecRef ty
+@[inline] def mkTypeRef (ty : PyType) : BaseIO TypeRef := do
+  (·.toTypeRef) <$> mkDTypeRef ty

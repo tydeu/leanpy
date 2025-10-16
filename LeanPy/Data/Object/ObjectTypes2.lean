@@ -23,7 +23,7 @@ def boolTypeDoc : String := "\
   The class bool is a subclass of the class int, and cannot be subclassed.\
   "
 
-@[reducible] def boolType : TypeSpec where
+@[reducible] def boolType : PyType where
   name := "bool"
   doc? := some boolTypeDoc
   base? := some intTypeRef
@@ -34,6 +34,6 @@ def boolTypeDoc : String := "\
     (id = .true → data = .mk (1 : IntRef)) ∧
     data.kind = typeName IntRef -- redundant, but makes `simp_all` work bellow
 
-initialize boolTypeRef' : DTypeSpecRef boolType ← mkDTypeSpecRef _
+initialize boolTypeRef' : DTypeRef boolType ← mkDTypeRef _
 
-abbrev boolTypeRef : TypeSpecRef := boolTypeRef'.toTypeSpecRef
+abbrev boolTypeRef : TypeRef := boolTypeRef'.toTypeRef
