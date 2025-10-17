@@ -7,26 +7,45 @@ import LeanPy.Data.Object.TypeRef
 
 namespace LeanPy
 
-/-- A type-indexed reference to a `TObjectSlots` structure. -/
+/--
+A type-indexed reference to a `SubObjectSlots` structure.
+
+While modelled in the logic as the type index, the runtime data for this type
+is the `SubObjectSlots` structure.
+-/
 structure TypeSlotsRef where
   private innerMk ::
     private innerTy : TypeRef
   deriving Nonempty
 
-noncomputable def TypeSlotsRef.ty (self : TypeSlotsRef) : TypeRef :=
+namespace TypeSlotsRef
+
+noncomputable def mk (ty : TypeRef) : TypeSlotsRef :=
+  innerMk ty
+
+protected noncomputable def ty (self : TypeSlotsRef) : TypeRef :=
   self.innerTy
 
-theorem TypeSlotsRef.ty_inj : ty a = ty b ↔ a = b := by
-  cases a; cases b; simp [ty]
+theorem ty_inj {a b : TypeSlotsRef} : a.ty = b.ty ↔ a = b := by
+  cases a; cases b; simp [TypeSlotsRef.ty]
+
+end TypeSlotsRef
 
 /-- Class used to infer the slots for a type. -/
-class TypeSlots (ty : TypeRef) where
+class TypeSlots (ty : TypeRef) where mk' ::
   slotsRef : TypeSlotsRef
   ty_slotsRef : slotsRef.ty = ty := by rfl
 
-attribute [simp] TypeSlots.ty_slotsRef
+namespace TypeSlots
 
-instance : Nonempty (TypeSlots ty) := ⟨{slotsRef.innerTy := ty}⟩
+attribute [simp] ty_slotsRef
+
+noncomputable def mk {ty : TypeRef} : TypeSlots ty :=
+  .mk' (.mk ty)
+
+instance : Nonempty (TypeSlots ty) := ⟨.mk⟩
+
+end TypeSlots
 
 namespace TypeRef
 export TypeSlots (slotsRef ty_slotsRef)
