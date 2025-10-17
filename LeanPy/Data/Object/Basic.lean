@@ -3,10 +3,8 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
-import LeanPy.Data.Object.TypeRef
-import LeanPy.Data.Object.TypeSlotsRef
-import LeanPy.Data.Object.LawfulTypeRef
-import LeanPy.Data.Object.ObjectTypes2
+import LeanPy.Data.Type.Slots
+import LeanPy.Data.Type.Lawful
 import LeanPy.Data.HashDict
 import LeanPy.Data.AttrName
 

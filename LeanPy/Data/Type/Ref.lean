@@ -3,7 +3,7 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
-import LeanPy.Data.Object.Type
+import LeanPy.Data.Type.Basic
 
 namespace LeanPy
 
