@@ -12,7 +12,7 @@ namespace LeanPy
 /-! ## `object` -/
 
 /- An instance of a subclass of `object` that satisfies `p`. -/
-abbrev PObjectObject (p : TypeProp) := PObject (p.Subtype objectTypeRef)
+abbrev PObjectObject (p : ObjectProp) := PObject (p.AndInstance objectTypeRef)
 
 /--
 An instance of `object` or one of its subtypes interpreted as an `object`.
@@ -26,7 +26,7 @@ def ObjectObject := PObjectObject .Any
 
 /-- Casts `self` to `ObjectObject` (`object`). -/
 @[inline] def Object.asObject (self : Object) : ObjectObject :=
-  self.downcast self.ty.subset_objectType
+  self.asSubObject self.ty.subset_objectType
 
 instance : Coe Object ObjectObject := ⟨Object.asObject⟩
 
@@ -87,7 +87,7 @@ def mkObjectObject : BaseIO ObjectObject := do
 /-! ## `type` -/
 
 /- An instance of a subclass of `type` that satisfies `p`. -/
-abbrev PTypeObject (p : TypeProp) := PSubObject p typeTypeRef
+abbrev PTypeObject (p : ObjectProp) := PSubObject p typeTypeRef
 
 /- An instance of `type` or one of its subtypes. -/
 def TypeObject := PTypeObject .Any
@@ -98,7 +98,7 @@ def TypeObject := PTypeObject .Any
 
 /-- Casts `self` to `TypeObject`. -/
 @[inline] def Object.asType (self : Object) (h : self.isType) : TypeObject :=
-  self.downcast (self.ty.isTypeSubclass_iff_subset.mp h)
+  self.asSubObject (self.ty.isTypeSubclass_iff_subset.mp h)
 
 /--
 Casts `self` to `TypeObject` if `self` is instance of a subtype of `type`.
@@ -120,9 +120,19 @@ theorem isType_toObject (self : TypeObject) : self.toObject.isType :=
 @[inline] def getType (self : TypeObject) : PyType :=
   self.getTypeRef.data
 
+/--
+Returns the name of the type.
+
+This is equivalent to the Python `vars(type)['__name__'].__get__(self)`.
+-/
 def name (self : TypeObject) : String :=
   self.getType.name
 
+/--
+Returns a string representation of the type.
+
+This is equivalent to the Python `type.__repr__(self)`.
+-/
 def repr (self : TypeObject) : String :=
   s!"<class '{self.name}'>"
 
@@ -275,7 +285,7 @@ where
     Lean.isLetterLike c
 
 /- An instance of a subclass of `str` that satisfies `p`. -/
-abbrev PStrObject (p : TypeProp) := PSubObject p strTypeRef
+abbrev PStrObject (p : ObjectProp) := PSubObject p strTypeRef
 
 /- An instance of a subclass of `str`. -/
 def StrObject := PStrObject .Any
@@ -286,7 +296,7 @@ def StrObject := PStrObject .Any
 
 /-- Casts `self` to `StrObject`. -/
 @[inline] def Object.asStr (self : Object) (h : self.isStr) : StrObject :=
-  self.downcast (self.ty.isStrSubclass_iff_subset.mp h)
+  self.asSubObject (self.ty.isStrSubclass_iff_subset.mp h)
 
 /--
 Casts `self` to `StrObject` if `self` is instance of a subtype of `str`.
@@ -351,10 +361,10 @@ def strTypeRef.slots : TObjectSlots StrObject where
 /-! ## `int` Objects -/
 
 /- An instance of a subtype of `int` that satisfies `p`. -/
-def PIntObject (p : TypeProp) := PSubObject p intTypeRef
+def PIntObject (p : ObjectProp) := PSubObject p intTypeRef
 
 /- An instance of the type `ty` that satisfies `p` and subclasses `int` . -/
-abbrev PSubIntObject (p : TypeProp) (ty : TypeRef) := PIntObject (p.Subtype ty)
+abbrev PSubIntObject (p : ObjectProp) (ty : TypeRef) := PIntObject (p.AndInstance ty)
 
 /- An instance of a subclass of `int`. -/
 abbrev IntObject := PIntObject .Any
@@ -366,7 +376,7 @@ theorem Object.isInt_iff_subset : isInt self ↔ self.ty ⊆ intTypeRef :=
   self.ty.isIntSubclass_iff_subset
 
 @[inline] def Object.asInt (self : Object) (h : self.isInt) : IntObject :=
-  self.downcast (self.ty.isIntSubclass_iff_subset.mp h)
+  self.asSubObject (self.ty.isIntSubclass_iff_subset.mp h)
 
 @[inline] def Object.asInt? (self : Object) : Option IntObject :=
   if h : self.isInt then some (self.asInt h) else none
@@ -436,7 +446,7 @@ instance : OfNat Object 0 := ⟨(0 : IntObject)⟩
   simp [TypeRef.Subtype.iff_eq_or_mem_baseMro]
 
 /-- An instance of a subclass of `bool` that satisfies `p`. -/
-def PBoolObject (p : TypeProp) := PSubIntObject p boolTypeRef
+def PBoolObject (p : ObjectProp) := PSubIntObject p boolTypeRef
 
 /-- An instance of a subclass of `bool`. There are only two, `True` and `False`. -/
 abbrev BoolObject := PBoolObject .Any
@@ -460,7 +470,7 @@ theorem Object.isBool_iff_subset : isBool self ↔ self.ty ⊆ boolTypeRef := by
 
 /-- Casts `self` to `BoolObject`. -/
 @[inline] def Object.asBool (self : Object) (h : self.isBool) : BoolObject :=
-  self.downcast (self.isBool_iff_subset.mp h)
+  self.asSubObject (self.isBool_iff_subset.mp h)
 
 /--
 Casts `self` to `BoolObject` if `self` is either the `True` or `False` singleton.
