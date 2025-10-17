@@ -30,7 +30,9 @@ syntax lambdaParam := name
 
 /-! ## Expressions -/
 
-declare_syntax_cat pyExpr (behavior := symbol)
+-- Cannot be `(behavior := symbol)` due to
+-- https://github.com/leanprover/lean4/issues/2395
+declare_syntax_cat pyExpr
 
 syntax typeComment := "# " &"type: " pyExpr
 

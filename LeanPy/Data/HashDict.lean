@@ -382,7 +382,7 @@ instance [Hashable α] [BEq α] : GetElem? (HashDict α β) α β (fun d k => k 
   getElem? d k := get? k d
 
 @[inline] def insert
-  [Hashable α] [BEq α] (k : α) (v : β) (self : HashDict α β)
+  [Hashable α] [BEq α] (self : HashDict α β) (k : α) (v : β)
 : HashDict α β := ⟨self.raw.insert k v⟩
 
 @[specialize] def ofArray [Hashable α] [BEq α] (items : Array (α × β)) : HashDict α β :=

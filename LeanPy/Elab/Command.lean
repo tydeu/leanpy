@@ -59,7 +59,14 @@ open Grammar
 scoped syntax (name := evalPyCmd) withPosition("#eval_py" Grammar.block) : command
 
 def mkPyContext : BaseIO PyContext := do
-  let globals ← mkMutableRef {}
+  let globals := -- TODO: proper built-ins
+    (∅ : AttrDict)
+    |>.insert "object" objectTypeRef
+    |>.insert "type" typeTypeRef
+    |>.insert "str" strTypeRef
+    |>.insert "int" intTypeRef
+    |>.insert "bool" boolTypeRef
+  let globals ← mkMutableRef globals
   return {globals}
 
 @[command_elab evalPyCmd]

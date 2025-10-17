@@ -25,6 +25,8 @@ instance : BEq AttrName := ⟨AttrName.beq⟩
 @[inline] def ofString (s : String) : AttrName :=
   ⟨.str .anonymous s, True.intro⟩
 
+instance : Coe String AttrName := ⟨.ofString⟩
+
 @[inline] protected def toString (self : AttrName) : String :=
   match self with | ⟨.str .anonymous s, _⟩ => s
 

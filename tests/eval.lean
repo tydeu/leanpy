@@ -41,6 +41,23 @@ open LeanPy
 /-- info: 'helloworld' -/
 #guard_msgs in #eval_py "hello" "world"
 
+/-! ## Types -/
+
+/-- info: <class 'object'> -/
+#guard_msgs in #eval_py object
+
+/-- info: <class 'type'> -/
+#guard_msgs in #eval_py type
+
+/-- info: <class 'str'> -/
+#guard_msgs in #eval_py str
+
+/-- info: <class 'int'> -/
+#guard_msgs in #eval_py int
+
+/-- info: <class 'bool'> -/
+#guard_msgs in #eval_py bool
+
 /-! ## Comparisons -/
 
 /-- info: False -/
@@ -75,6 +92,18 @@ open LeanPy
 
 /-- info: False -/
 #guard_msgs in #eval_py "abc" != "abc"
+
+/-- info: True -/
+#guard_msgs in #eval_py "abc" != "def"
+
+/-- info: True -/
+#guard_msgs in #eval_py type == type
+
+/-- info: False -/
+#guard_msgs in #eval_py type != type
+
+/-- info: True -/
+#guard_msgs in #eval_py int != type
 
 /-! ## Conditionals -/
 
