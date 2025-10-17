@@ -39,6 +39,65 @@ structure Object extends raw : Object.Raw where mk' ::
 
 instance {self : Object} : LawfulTypeRef self.ty := self.lawful_ty
 
+/-! ## Object Basics -/
+
+namespace Object
+
+@[inline] def getData
+  [Nonempty α] [TypeName α] (self : Object) (h : self.data.kind = typeName α)
+: α := self.data.get h
+
+theorem eq_iff (self other : Object) :
+  self = other ↔
+  self.id = other.id ∧ self.ty = other.ty ∧ self.data = other.data
+:= by
+  let {lawful_slots := h1, ..} := self
+  let {lawful_slots := h2, ..} := other
+  simp [mk'.injEq, ← TypeSlotsRef.ty_inj, h1, h2]
+
+/--
+Returns whether this object is the constant `None`.
+
+Equivalent to the Python `self is None`.
+-/
+@[inline] def isNone (self : Object) : Bool :=
+  self.id == .none
+
+/--
+Returns whether this object is not the constant `None`.
+
+Equivalent to the Python `self is not None`.
+-/
+@[inline] def isNotNone (self : Object) : Bool :=
+  self.id != .none
+
+
+/--
+Returns whether this object is the `True` singleton.
+
+This is equivalent to the Python `self is True`.
+-/
+@[inline] def isTrue (self : Object) : Bool :=
+  self.id == .true
+
+/--
+Returns whether this object is the `False` singleton.
+
+This is equivalent to the Python `self is False`.
+-/
+@[inline] def isFalse (self : Object) : Bool :=
+  self.id == .false
+
+/--
+Returns whether this object is the `True` or `False` singleton.
+
+This is equivalent to the Python `self is True or self is False`.
+-/
+@[inline] def isBool (self : Object) : Bool :=
+  self.isFalse || self.isTrue
+
+end Object
+
 /-! ## TypeProp -/
 
 /--
@@ -114,7 +173,16 @@ theorem PObject.lawful_subobject
   {self : PSubObject p ty} : ty.data.IsValidObject self.id self.data
 := self.toObject.lawful_subobject self.property.ty_subset
 
-/-! ## Object Basics -/
+theorem PObject.toObject_inj {self other : PObject p} :
+  self.toObject = other.toObject ↔ self = other
+:= by cases self; cases other; simp
+
+theorem PObject.eq_iff {self other : PObject p} :
+  self = other ↔
+  self.id = other.id ∧ self.ty = other.ty ∧ self.data = other.data
+:= by simp [← toObject_inj, Object.eq_iff]
+
+/-! ## Object Constructor -/
 
 def TypeRef.mkObject
   [TypeName α]
@@ -131,21 +199,6 @@ def TypeRef.mkObject
   lawful_object := h
 }
 
-namespace Object
-
-@[inline] def getData
-  [Nonempty α] [TypeName α] (self : Object) (h : self.data.kind = typeName α)
-: α := self.data.get h
-
-theorem eq_iff (self other : Object) :
-  self = other ↔
-  self.id = other.id ∧ self.ty = other.ty ∧ self.data = other.data
-:= by
-  let {lawful_slots := h1, ..} := self
-  let {lawful_slots := h2, ..} := other
-  simp [mk'.injEq, ← TypeSlotsRef.ty_inj, h1, h2]
-
-end Object
 
 /-! `PyM` -/
 

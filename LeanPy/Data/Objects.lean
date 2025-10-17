@@ -68,7 +68,7 @@ end ObjectObject
 
 instance : ToString Object := ⟨(·.asObject.repr)⟩
 
-def objectTObjectSlots : TObjectSlots ObjectObject where
+def objectTypeRef.slots : TObjectSlots ObjectObject where
   hash self := return self.hash
   beq self other := return self.beq other
   bne self other := return self.bne other
@@ -76,7 +76,7 @@ def objectTObjectSlots : TObjectSlots ObjectObject where
   repr self := return self.repr
 
 @[instance] initialize objectTypeSlotsRef : TypeSlots objectTypeRef ←
-  objectTObjectSlots.mkRef
+  objectTypeRef.slots.mkRef
 
 def ObjectObject.ofVoidRef (ref : VoidRef) : ObjectObject :=
   objectTypeRef.mkObject ref.id  ref
@@ -128,7 +128,7 @@ def repr (self : TypeObject) : String :=
 
 end TypeObject
 
-def typeTObjectSlots : TObjectSlots TypeObject where
+def typeTypeRef.slots : TObjectSlots TypeObject where
   hash self := return self.asObject.hash
   beq self other := return self.asObject.beq other
   bne self other := return self.asObject.bne other
@@ -136,7 +136,7 @@ def typeTObjectSlots : TObjectSlots TypeObject where
   repr self := return self.repr
 
 @[instance] initialize typeTypeSlotsRef : TypeSlots typeTypeRef ←
-  typeTObjectSlots.mkRef
+  typeTypeRef.slots.mkRef
 
 namespace TypeObject
 
@@ -162,25 +162,21 @@ def mkTypeObject (ty : PyType) : BaseIO TypeObject := do
 /- An instance of type `none`. There is only one, `None`. -/
 def NoneObject := SubObject noneTypeRef
 
-/--
-Returns whether this object is the constant `None`.
-
-Equivalent to the Python `self is None`.
--/
-@[inline] def Object.isNone (self : Object) : Bool :=
-  self.id == .none
-
-/--
-Returns whether this object is not the constant `None`.
-
-Equivalent to the Python `self is not None`.
--/
-@[inline] def Object.isNotNone (self : Object) : Bool :=
-  self.id != .none
-
 namespace NoneObject
 
 instance : Coe NoneObject Object := ⟨PObject.toObject⟩
+
+-- @[simp] theorem id_eq : (self : NoneObject).id = .none :=
+--   self.lawful_subobject.1
+
+-- @[simp] theorem isNone_eq_true : (self : NoneObject).isNone := by
+--   simp [Object.isNone]
+
+-- @[simp] theorem ty_eq : (self : NoneObject).ty = noneTypeRef :=
+--   self.lawful_none id_eq
+
+-- @[simp] theorem data_eq : (self : NoneObject).data = .mk () :=
+--   self.lawful_subobject.2
 
 protected def hash : Hash :=
   hash ObjectId.none
@@ -190,7 +186,7 @@ protected def repr : String :=
 
 end NoneObject
 
-def noneTObjectSlots : TObjectSlots NoneObject where
+def noneTypeRef.slots : TObjectSlots NoneObject where
   hash _ := return NoneObject.hash
   beq _ other := return other.isNone
   bne _ other := return other.isNotNone
@@ -198,7 +194,7 @@ def noneTObjectSlots : TObjectSlots NoneObject where
   repr _ := return NoneObject.repr
 
 @[instance] initialize noneTypeSlotsRef : TypeSlots noneTypeRef ←
-  noneTObjectSlots.mkRef
+  noneTypeRef.slots.mkRef
 
 namespace Object
 
@@ -206,10 +202,10 @@ protected def none : NoneObject :=
   noneTypeRef.mkObject .none ()
 
 instance : CoeDep (Option α) none Object := ⟨Object.none⟩
-instance : CoeDep (Option α) none NoneObject := ⟨Object.none⟩
+
+instance : Inhabited Object := ⟨none⟩
 
 @[simp] theorem isNone_none : isNone none := rfl
-
 @[simp] theorem id_none : (none : Object).id = .none := rfl
 @[simp] theorem ty_none : (none : Object).ty = noneTypeRef := rfl
 @[simp] theorem data_none : (none : Object).data = .mk () := rfl
@@ -224,6 +220,17 @@ theorem isNone_iff_eq_none : isNone self ↔ self = none := by
 instance : Inhabited Object := ⟨none⟩
 
 end Object
+
+namespace NoneObject
+
+instance : CoeDep (Option α) none NoneObject := ⟨Object.none⟩
+
+@[simp] theorem eq_none : (self : NoneObject) = none := by
+  suffices h : self.isNone by
+    simp [← self.toObject_inj, self.isNone_iff_eq_none.mp h]
+  simp [Object.isNone, self.lawful_subobject.1]
+
+end NoneObject
 
 /-! ## `str` Objects -/
 
@@ -324,7 +331,7 @@ theorem isStr_toObject (self : StrObject) : self.toObject.isStr :=
 
 end StrObject
 
-def strTObjectSlots : TObjectSlots StrObject where
+def strTypeRef.slots : TObjectSlots StrObject where
   hash self := return self.hash
   beq self other := return other.asStr?.any self.beq
   bne self other := return other.asStr?.all self.bne
@@ -333,7 +340,7 @@ def strTObjectSlots : TObjectSlots StrObject where
   repr self := return self.repr
 
 @[instance] initialize strTypeSlotsRef : TypeSlots strTypeRef ←
-  strTObjectSlots.mkRef
+  strTypeRef.slots.mkRef
 
 @[inline] def StrObject.ofStringRef (r : StringRef) : StrObject :=
   strTypeRef.mkObject r.id  r
@@ -374,6 +381,9 @@ theorem ty_subset_intType {self : PIntObject p} : self.ty ⊆ intTypeRef :=
 theorem isInt_toObject (self : PIntObject p) : self.toObject.isInt :=
   self.isInt_iff_subset.mpr self.ty_subset_intType
 
+@[inline] nonrec def asInt (self : PIntObject p) : IntObject :=
+  self.asInt self.isInt_toObject
+
 @[inline] def getIntRef (self : PIntObject p) : IntRef :=
   self.getData self.lawful_subobject
 
@@ -397,7 +407,7 @@ theorem isInt_toObject (self : PIntObject p) : self.toObject.isInt :=
 
 end PIntObject
 
-def intTObjectSlots : TObjectSlots IntObject where
+def intTypeRef.slots : TObjectSlots IntObject where
   hash self := return self.hash
   beq self other := return other.asInt?.any self.beq
   bne self other := return other.asInt?.all self.bne
@@ -405,7 +415,7 @@ def intTObjectSlots : TObjectSlots IntObject where
   repr self := return self.repr
 
 @[instance] initialize intTypeSlotsRef : TypeSlots intTypeRef ←
-  intTObjectSlots.mkRef
+  intTypeRef.slots.mkRef
 
 @[inline] def IntObject.ofIntRef (n : IntRef) : IntObject :=
   intTypeRef.mkObject n.id  n
@@ -435,30 +445,6 @@ abbrev BoolObject := PBoolObject .Any
   self.upcast boolTypeRef_subset_intTypeRef
 
 instance : Coe (SubObject boolTypeRef) BoolObject := ⟨.ofSubObject⟩
-
-/--
-Returns whether this object is the `True` singleton.
-
-This is equivalent to the Python `self is True`.
--/
-@[inline] def Object.isTrue (self : Object) : Bool :=
-  self.id == .true
-
-/--
-Returns whether this object is the `False` singleton.
-
-This is equivalent to the Python `self is False`.
--/
-@[inline] def Object.isFalse (self : Object) : Bool :=
-  self.id == .false
-
-/--
-Returns whether this object is the `True` or `False` singleton.
-
-This is equivalent to the Python `self is True or self is False`.
--/
-@[inline] def Object.isBool (self : Object) : Bool :=
-  self.isFalse || self.isTrue
 
 theorem Object.ty_eq_of_isBool : isBool self → self.ty = boolTypeRef := by
   simp only [isBool, isTrue, isFalse, Bool.or_eq_true, beq_iff_eq]
@@ -495,14 +481,14 @@ def repr (self : BoolObject) : String :=
 
 end BoolObject
 
-def boolTObjectSlots : TObjectSlots BoolObject := {
-  intTObjectSlots.downcast boolTypeRef_subset_intTypeRef with
+def boolTypeRef.slots : TObjectSlots BoolObject := {
+  intTypeRef.slots.downcast boolTypeRef_subset_intTypeRef with
   str self := return self.repr
   repr self := return self.repr
 }
 
 @[instance] initialize boolTypeSlotsRef : TypeSlots boolTypeRef ←
-  boolTObjectSlots.stripCast boolTypeRef_subset_intTypeRef |>.mkRef
+  boolTypeRef.slots.stripCast boolTypeRef_subset_intTypeRef |>.mkRef
 
 namespace BoolObject
 
