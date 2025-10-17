@@ -3,15 +3,7 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
-import LeanPy.Data.IntRef
-import LeanPy.Data.StringRef
-import LeanPy.Data.MutableRef
-import LeanPy.Data.Object.ObjectTypes
-
-/-!
-Built-in types inheriting from a direct subclass of `object`. These are in a
-separate file from their parents due to `initialize` limitations.
--/
+import LeanPy.Data.Int.TypeRef
 
 namespace LeanPy
 

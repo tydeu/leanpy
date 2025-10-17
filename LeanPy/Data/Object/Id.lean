@@ -3,7 +3,7 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
-import LeanPy.Data.IntRef
+import LeanPy.Data.Int.Ref
 import LeanPy.Data.NonScalarRef
 import LeanPy.Util.String
 

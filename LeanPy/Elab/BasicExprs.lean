@@ -4,6 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
 import LeanPy.Elab.Command
+import LeanPy.Data.None.Object
+import LeanPy.Data.Bool.Object
+import LeanPy.Data.Str.Object
 
 namespace LeanPy
 

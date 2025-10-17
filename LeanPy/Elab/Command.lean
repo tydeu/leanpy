@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
 import LeanPy.Grammar
-import LeanPy.Data.Objects
+import LeanPy.Data.Type.Object
 import LeanPy.Util.Elab
 
 open Lean Elab Command Parser

@@ -3,8 +3,12 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
-import LeanPy.Data.Type.Ref
-import LeanPy.Data.Object.ObjectTypes2
+import LeanPy.Data.Type.TypeRef
+import LeanPy.Data.Object.TypeRef
+import LeanPy.Data.Bool.TypeRef
+import LeanPy.Data.Int.TypeRef
+import LeanPy.Data.None.TypeRef
+import LeanPy.Data.Str.TypeRef
 
 namespace LeanPy
 

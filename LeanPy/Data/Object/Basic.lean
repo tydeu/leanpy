@@ -5,6 +5,7 @@ Authors: Mac Malone
 -/
 import LeanPy.Data.Type.Slots
 import LeanPy.Data.Type.Lawful
+import LeanPy.Data.MutableRef
 import LeanPy.Data.HashDict
 import LeanPy.Data.AttrName
 
