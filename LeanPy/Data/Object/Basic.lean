@@ -16,7 +16,7 @@ namespace LeanPy
 
 /-! ## TypeSlotsRef -/
 
-/-- A reference to a `TypeSlots` structure. -/
+/-- A type-indexed reference to a `TObjectSlots` structure. -/
 structure TypeSlotsRef where
   private innerMk ::
     private innerTy : TypeRef
@@ -28,15 +28,18 @@ noncomputable def TypeSlotsRef.ty (self : TypeSlotsRef) : TypeRef :=
 theorem TypeSlotsRef.ty_inj : ty a = ty b ↔ a = b := by
   cases a; cases b; simp [ty]
 
-structure DTypeSlotsRef (ty : TypeRef) extends TypeSlotsRef where
-  ty_eq : toTypeSlotsRef.ty = ty := by rfl
+/-- Class used to infer the slots for a type. -/
+class TypeSlots (ty : TypeRef) where
+  slotsRef : TypeSlotsRef
+  ty_slotsRef : slotsRef.ty = ty := by rfl
 
-attribute [simp] DTypeSlotsRef.ty_eq
+attribute [simp] TypeSlots.ty_slotsRef
 
-instance : CoeOut (DTypeSlotsRef ty) TypeSlotsRef :=
-  ⟨DTypeSlotsRef.toTypeSlotsRef⟩
+instance : Nonempty (TypeSlots ty) := ⟨{slotsRef.innerTy := ty}⟩
 
-instance : Nonempty (DTypeSlotsRef ty) := ⟨{innerTy := ty}⟩
+namespace TypeRef
+export TypeSlots (slotsRef ty_slotsRef)
+end TypeRef
 
 /-! ## Object -/
 
@@ -51,7 +54,7 @@ structure Object.Raw where mk ::
   /-- The object's Python type. -/
   protected ty : TypeRef
   /-- The type's slots. Used to optimize magic methods. -/
-  innerSlots : TypeSlotsRef
+  innerSlots : TypeSlotsRef := by exact ty.slotsRef
   /-- The object's Lean data. -/
   data : ObjectData
 
@@ -161,44 +164,10 @@ structure PyContext where
 /-- The monad of Python code. -/
 abbrev PyM := ReaderT PyContext <| EIO ErrorObject
 
-/-! ## Object Basics -/
-
-namespace Object
-
-def mk
-  [TypeName α] (id : ObjectId)
-  (ty : TypeRef) [LawfulTypeRef ty]
-  (slots : DTypeSlotsRef ty) (data : α)
-  (h : ty.data.IsValidObject id (.mk data) := by simp)
-  (h_none : id = .none → ty = noneTypeRef := by simp)
-  (h_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp)
-: Object where
-  id; ty
-  innerSlots := slots
-  data := ObjectData.mk data
-  lawful_slots := slots.ty_eq
-  lawful_none := h_none
-  lawful_bool := h_bool
-  lawful_object := h
-
-@[inline] def getData
-  [Nonempty α] [TypeName α] (self : Object) (h : self.data.kind = typeName α)
-: α := self.data.get h
-
-theorem eq_iff (self other : Object) :
-  self = other ↔
-  self.id = other.id ∧ self.ty = other.ty ∧ self.data = other.data
-:= by
-  let {lawful_slots := h1, ..} := self
-  let {lawful_slots := h2, ..} := other
-  simp [mk'.injEq, ← TypeSlotsRef.ty_inj, h1, h2]
-
-end Object
-
 /-! ## Slots -/
 
-/-- Untyped object slots. -/
-structure TypeSlots (α : Type u) where
+/-- Slots for an object of Lean type `α`. -/
+structure TObjectSlots (α : Type u) where
   /-- The type's `__hash__` slot.  -/
   hash (self : α) : PyM Hash
   /-- The type's `==` slot. Unlike `__eq__`, this returns `Bool`.  -/
@@ -214,19 +183,19 @@ structure TypeSlots (α : Type u) where
   deriving Nonempty
 
 /-- Slots compatible with instances of types that satisfy `p`. -/
-abbrev PTypeSlots (p : TypeProp) := TypeSlots (PObject p)
+abbrev PObjectSlots (p : TypeProp) := TObjectSlots (PObject p)
 
 /-- Slots compatible with instances of `ty` or its subtypes. -/
-abbrev SubTypeSlots (ty : TypeRef) := TypeSlots (SubObject ty)
+abbrev SubObjectSlots (ty : TypeRef) := TObjectSlots (SubObject ty)
 
-@[inline] private unsafe def TypeSlots.castImpl
-  (_ : ∀ {ty}, q ty → p ty) (slots : TypeSlots (PObject p))
-: (PTypeSlots q) := unsafeCast slots
+@[inline] private unsafe def TObjectSlots.castImpl
+  (_ : ∀ {ty}, q ty → p ty) (slots : TObjectSlots (PObject p))
+: (PObjectSlots q) := unsafeCast slots
 
 @[implemented_by castImpl]
-def TypeSlots.impCast
-  (h : ∀ {ty}, q ty → p ty) (slots : TypeSlots (PObject p))
-: (PTypeSlots q) where
+def TObjectSlots.impCast
+  (h : ∀ {ty}, q ty → p ty) (slots : TObjectSlots (PObject p))
+: (PObjectSlots q) where
   hash self := slots.hash (self.cast (h self.property))
   beq self other := slots.beq (self.cast (h self.property)) other
   bne self other := slots.beq (self.cast (h self.property)) other
@@ -234,39 +203,39 @@ def TypeSlots.impCast
   repr self := slots.repr (self.cast (h self.property))
   str self := slots.str (self.cast (h self.property))
 
-@[inline] def TypeSlots.downcast
-  (h : subTy ⊆ superTy) (slots : TypeSlots (PSubObject p superTy))
-: TypeSlots (PSubSubObject p subTy superTy) :=
+@[inline] def TObjectSlots.downcast
+  (h : subTy ⊆ superTy) (slots : TObjectSlots (PSubObject p superTy))
+: TObjectSlots (PSubSubObject p subTy superTy) :=
   slots.impCast (fun hp => hp.property.trans h)
 
-@[inline] def TypeSlots.stripCast
-  (h : subTy ⊆ superTy) (slots : TypeSlots (PSubSubObject p subTy superTy))
-: TypeSlots (PSubObject p subTy) :=
+@[inline] def TObjectSlots.stripCast
+  (h : subTy ⊆ superTy) (slots : TObjectSlots (PSubSubObject p subTy superTy))
+: TObjectSlots (PSubObject p subTy) :=
   slots.impCast (fun hp => ⟨hp, .trans hp.ty_subset h⟩)
 
-@[inline] def TypeSlots.eqCast
-  (h : ty₁ = ty₂)  (slots : TypeSlots (SubObject ty₁)) : TypeSlots (SubObject ty₂)
+@[inline] def TObjectSlots.eqCast
+  (h : ty₁ = ty₂)  (slots : TObjectSlots (SubObject ty₁)) : TObjectSlots (SubObject ty₂)
 := slots.impCast (fun h' => h ▸ h')
 
-@[inline] private unsafe def TypeSlots.mkRefImpl
-  (slots : TypeSlots (SubObject ty)) :  BaseIO (DTypeSlotsRef ty)
+@[inline] private unsafe def TObjectSlots.mkRefImpl
+  (slots : SubObjectSlots ty) :  BaseIO (TypeSlots ty)
 := pure (unsafeCast slots)
 
 @[implemented_by mkRefImpl]
-opaque TypeSlots.mkRef
-  (slots : TypeSlots (SubObject ty)) : BaseIO (DTypeSlotsRef ty)
+opaque TObjectSlots.mkRef
+  (slots : SubObjectSlots ty) : BaseIO (TypeSlots ty)
 
 @[inline] private unsafe def TypeSlotsRef.getImpl
-  (self : TypeSlotsRef) : BaseIO (SubTypeSlots self.ty)
+  (self : TypeSlotsRef) : BaseIO (SubObjectSlots self.ty)
 := pure (unsafeCast self)
 
 @[implemented_by getImpl]
 opaque TypeSlotsRef.get
-  (self : TypeSlotsRef) : BaseIO (SubTypeSlots self.ty)
+  (self : TypeSlotsRef) : BaseIO (SubObjectSlots self.ty)
 
 /-! ## Slot-based Methods -/
 
-@[inline] def Object.getSlots (self : Object) : BaseIO (SubTypeSlots self.ty) :=
+@[inline] def Object.getSlots (self : Object) : BaseIO (SubObjectSlots self.ty) :=
   (·.eqCast self.lawful_slots) <$> self.innerSlots.get
 
 @[inline] def Object.hashM (self : Object) : PyM Hash := do
@@ -286,6 +255,39 @@ opaque TypeSlotsRef.get
 
 @[inline] def Object.toBoolM (self : Object) : PyM Bool := do
   (← self.getSlots).bool self.toSubObject
+
+/-! ## Object Basics -/
+
+def TypeRef.mkObject
+  [TypeName α]
+  (ty : TypeRef) [LawfulTypeRef ty] [TypeSlots ty]
+  (id : ObjectId) (data : α)
+  (h : ty.IsValidObject id (.mk data) := by simp)
+  (h_none : id = .none → ty = noneTypeRef := by simp)
+  (h_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp)
+: SubObject ty := Object.toSubObject {
+  id, ty
+  data := ObjectData.mk data
+  lawful_none := h_none
+  lawful_bool := h_bool
+  lawful_object := h
+}
+
+namespace Object
+
+@[inline] def getData
+  [Nonempty α] [TypeName α] (self : Object) (h : self.data.kind = typeName α)
+: α := self.data.get h
+
+theorem eq_iff (self other : Object) :
+  self = other ↔
+  self.id = other.id ∧ self.ty = other.ty ∧ self.data = other.data
+:= by
+  let {lawful_slots := h1, ..} := self
+  let {lawful_slots := h2, ..} := other
+  simp [mk'.injEq, ← TypeSlotsRef.ty_inj, h1, h2]
+
+end Object
 
 /-! ## `object` -/
 
@@ -346,18 +348,18 @@ end ObjectObject
 
 instance : ToString Object := ⟨(·.asObject.repr)⟩
 
-def objectTypeSlots : TypeSlots ObjectObject where
+def objectTObjectSlots : TObjectSlots ObjectObject where
   hash self := return self.hash
   beq self other := return self.beq other
   bne self other := return self.bne other
   bool _ := return true
   repr self := return self.repr
 
-initialize objectTypeSlotsRef : DTypeSlotsRef objectTypeRef ←
-  objectTypeSlots.mkRef
+@[instance] initialize objectTypeSlotsRef : TypeSlots objectTypeRef ←
+  objectTObjectSlots.mkRef
 
 def ObjectObject.ofVoidRef (ref : VoidRef) : ObjectObject :=
-  Object.mk ref.id objectTypeRef objectTypeSlotsRef ref |>.toSubObject
+  objectTypeRef.mkObject ref.id  ref
 
 def mkObjectObject : BaseIO ObjectObject := do
   ObjectObject.ofVoidRef <$> mkVoidRef
@@ -406,25 +408,25 @@ def repr (self : TypeObject) : String :=
 
 end TypeObject
 
-def typeTypeSlots : TypeSlots TypeObject where
+def typeTObjectSlots : TObjectSlots TypeObject where
   hash self := return self.asObject.hash
   beq self other := return self.asObject.beq other
   bne self other := return self.asObject.bne other
   bool _ := return true
   repr self := return self.repr
 
-initialize typeTypeSlotsRef : DTypeSlotsRef typeTypeRef ←
-  typeTypeSlots.mkRef
+@[instance] initialize typeTypeSlotsRef : TypeSlots typeTypeRef ←
+  typeTObjectSlots.mkRef
 
 namespace TypeObject
 
 def ofInitTypeRef (ref : InitTypeRef ty) : TypeObject :=
-  Object.mk ref.id typeTypeRef typeTypeSlotsRef ref.toTypeRef.toRawTypeRef |>.toSubObject
+  typeTypeRef.mkObject ref.id  ref.toTypeRef.toRawTypeRef
 
 instance : CoeOut (InitTypeRef ty) TypeObject := ⟨ofInitTypeRef⟩
 
 def ofTypeRef (ty : TypeRef) [LawfulTypeRef ty] : TypeObject :=
-  Object.mk ty.id typeTypeRef typeTypeSlotsRef ty.toRawTypeRef |>.toSubObject
+  typeTypeRef.mkObject ty.id  ty.toRawTypeRef
 
 instance [LawfulTypeRef ty] : CoeDep TypeRef ty TypeObject := ⟨ofTypeRef ty⟩
 instance [LawfulTypeRef ty] : CoeDep TypeRef ty Object := ⟨ofTypeRef ty⟩
@@ -468,20 +470,20 @@ protected def repr : String :=
 
 end NoneObject
 
-def noneTypeSlots : TypeSlots NoneObject where
+def noneTObjectSlots : TObjectSlots NoneObject where
   hash _ := return NoneObject.hash
   beq _ other := return other.isNone
   bne _ other := return other.isNotNone
   bool _ := return false
   repr _ := return NoneObject.repr
 
-initialize noneTypeSlotsRef : DTypeSlotsRef noneTypeRef ←
-  noneTypeSlots.mkRef
+@[instance] initialize noneTypeSlotsRef : TypeSlots noneTypeRef ←
+  noneTObjectSlots.mkRef
 
 namespace Object
 
 protected def none : NoneObject :=
-  Object.mk .none noneTypeRef noneTypeSlotsRef () |>.toSubObject
+  noneTypeRef.mkObject .none ()
 
 instance : CoeDep (Option α) none Object := ⟨Object.none⟩
 instance : CoeDep (Option α) none NoneObject := ⟨Object.none⟩
@@ -602,7 +604,7 @@ theorem isStr_toObject (self : StrObject) : self.toObject.isStr :=
 
 end StrObject
 
-def strTypeSlots : TypeSlots StrObject where
+def strTObjectSlots : TObjectSlots StrObject where
   hash self := return self.hash
   beq self other := return other.asStr?.any self.beq
   bne self other := return other.asStr?.all self.bne
@@ -610,11 +612,11 @@ def strTypeSlots : TypeSlots StrObject where
   str self := return self.toString
   repr self := return self.repr
 
-initialize strTypeSlotsRef : DTypeSlotsRef strTypeRef ←
-  strTypeSlots.mkRef
+@[instance] initialize strTypeSlotsRef : TypeSlots strTypeRef ←
+  strTObjectSlots.mkRef
 
 @[inline] def StrObject.ofStringRef (r : StringRef) : StrObject :=
-  Object.mk r.id strTypeRef strTypeSlotsRef r |>.toSubObject
+  strTypeRef.mkObject r.id  r
 
 @[inline] def mkStrObject (s : String) : BaseIO StrObject := do
   StrObject.ofStringRef <$> mkStringRef s
@@ -675,18 +677,18 @@ theorem isInt_toObject (self : PIntObject p) : self.toObject.isInt :=
 
 end PIntObject
 
-def intTypeSlots : TypeSlots IntObject where
+def intTObjectSlots : TObjectSlots IntObject where
   hash self := return self.hash
   beq self other := return other.asInt?.any self.beq
   bne self other := return other.asInt?.all self.bne
   bool self := return self.toBool
   repr self := return self.repr
 
-initialize intTypeSlotsRef : DTypeSlotsRef intTypeRef ←
-  intTypeSlots.mkRef
+@[instance] initialize intTypeSlotsRef : TypeSlots intTypeRef ←
+  intTObjectSlots.mkRef
 
 @[inline] def IntObject.ofIntRef (n : IntRef) : IntObject :=
-  Object.mk n.id intTypeRef intTypeSlotsRef n |>.toSubObject
+  intTypeRef.mkObject n.id  n
 
 instance : OfNat IntObject 0 := ⟨.ofIntRef 0⟩
 instance : Coe IntRef IntObject := ⟨.ofIntRef⟩
@@ -765,7 +767,7 @@ namespace BoolObject
 
 instance : Coe BoolObject Object := ⟨PObject.toObject⟩
 
-def getBool (self : BoolObject) : Bool :=
+@[inline] def getBool (self : BoolObject) : Bool :=
   self.getInt != 0
 
 def repr (self : BoolObject) : String :=
@@ -773,24 +775,24 @@ def repr (self : BoolObject) : String :=
 
 end BoolObject
 
-def boolTypeSlots : TypeSlots BoolObject := {
-  intTypeSlots.downcast boolTypeRef_subset_intTypeRef with
+def boolTObjectSlots : TObjectSlots BoolObject := {
+  intTObjectSlots.downcast boolTypeRef_subset_intTypeRef with
   str self := return self.repr
   repr self := return self.repr
 }
 
-initialize boolTypeSlotsRef : DTypeSlotsRef boolTypeRef ←
-  boolTypeSlots.stripCast boolTypeRef_subset_intTypeRef |>.mkRef
+@[instance] initialize boolTypeSlotsRef : TypeSlots boolTypeRef ←
+  boolTObjectSlots.stripCast boolTypeRef_subset_intTypeRef |>.mkRef
 
 namespace BoolObject
 
-protected def false : BoolObject := .ofSubObject <|
-  Object.mk .false boolTypeRef boolTypeSlotsRef (0 : IntRef) |>.toSubObject
+protected def false : BoolObject :=
+  boolTypeRef.mkObject .false (0 : IntRef)
 
 instance : CoeDep Bool false BoolObject := ⟨BoolObject.false⟩
 
-protected def true : BoolObject := .ofSubObject <|
-  Object.mk .true boolTypeRef boolTypeSlotsRef (1 : IntRef) |>.toSubObject
+protected def true : BoolObject :=
+  boolTypeRef.mkObject .true (1 : IntRef)
 
 instance : CoeDep Bool true BoolObject := ⟨BoolObject.true⟩
 
