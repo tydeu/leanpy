@@ -4,7 +4,7 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
 import LeanPy.Elab.Combinators
-import LeanPy.ParserCategories
+import LeanPy.Parser.Categories
 import Lake.Util.Message
 
 open Lean Lake Parser
