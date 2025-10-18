@@ -95,7 +95,7 @@ theorem isTrue_iff_eq_true : isTrue self ↔ self = true := by
   intro id_eq
   have ty_eq := self.lawful_bool (.inr id_eq)
   have data_eq := (ty_eq ▸ self.lawful_object).2.2.1 id_eq
-  simp [ty_eq, data_eq]
+  simpa [ty_eq] using data_eq
 
 @[simp] theorem id_false : (false : Object).id = .false := rfl
 @[simp] theorem ty_false : (false : Object).ty = boolTypeRef := rfl
@@ -106,6 +106,6 @@ theorem isFalse_iff_eq_false : isFalse self ↔ self = false := by
   intro id_eq
   have ty_eq := self.lawful_bool (.inl id_eq)
   have data_eq := (ty_eq ▸ self.lawful_object).2.1 id_eq
-  simp [ty_eq, data_eq]
+  simpa [ty_eq] using data_eq
 
 end Object

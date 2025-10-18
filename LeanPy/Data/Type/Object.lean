@@ -12,7 +12,7 @@ namespace LeanPy
 /- An instance of a subclass of `type` that satisfies `p`. -/
 abbrev PTypeObject (p : ObjectProp) := PSubObject p typeTypeRef
 
-/- An instance of `type` or one of its subtypes. -/
+/- An instance of a subclass of `type`. -/
 def TypeObject := PTypeObject .Any
 
 /-- Returns whether this object is an instance of a subtype of `type`. -/
@@ -34,11 +34,17 @@ namespace TypeObject
 
 instance : Coe TypeObject Object := ⟨PObject.toObject⟩
 
-theorem isType_toObject (self : TypeObject) : self.toObject.isType :=
+theorem isTypeSubclass_ty {self : TypeObject} : self.ty.isTypeSubclass :=
   self.ty.isTypeSubclass_iff_subset.mpr self.ty_subset
 
+theorem isType_toObject {self : TypeObject} : self.toObject.isType :=
+  self.isTypeSubclass_ty
+
 @[inline] def getTypeRef (self : TypeObject) : TypeRef :=
-  ⟨self.getData (self.lawful_subobject : typeType.IsValidObject _ _).2⟩
+  (self.data.get' <| self.lawful_ty_data self.isTypeSubclass_ty).1
+
+instance : LawfulTypeRef (getTypeRef self) :=
+  (self.data.get' <| self.lawful_ty_data self.isTypeSubclass_ty).2
 
 @[inline] def getType (self : TypeObject) : PyType :=
   self.getTypeRef.data
@@ -73,19 +79,21 @@ def typeTypeRef.slots : TObjectSlots TypeObject where
 
 namespace TypeObject
 
-def ofInitTypeRef (ref : InitTypeRef ty) : TypeObject :=
-  typeTypeRef.mkObject ref.id  ref.toTypeRef.toRawTypeRef
+-- def ofInitTypeRef (ref : InitTypeRef ty) : TypeObject :=
+--   typeTypeRef.mkObject ref.id ref.toTypeRef
 
-instance : CoeOut (InitTypeRef ty) TypeObject := ⟨ofInitTypeRef⟩
+-- instance : CoeOut (InitTypeRef ty) TypeObject := ⟨ofInitTypeRef⟩
 
 def ofTypeRef (ty : TypeRef) [LawfulTypeRef ty] : TypeObject :=
-  typeTypeRef.mkObject ty.id  ty.toRawTypeRef
+  typeTypeRef.mkObject ty.id ty (h_ty_data := fun _ => ⟨ty, by simp_all⟩)
 
 instance [LawfulTypeRef ty] : CoeDep TypeRef ty TypeObject := ⟨ofTypeRef ty⟩
 instance [LawfulTypeRef ty] : CoeDep TypeRef ty Object := ⟨ofTypeRef ty⟩
 
 end TypeObject
 
-def mkTypeObject (ty : PyType) : BaseIO TypeObject := do
-  -- TODO: figure out how to require lawfulness
-  .ofInitTypeRef <$> mkInitTypeRef (ty := ty)
+def mkTypeObject (ty : PyType) [LawfulType ty] (h : ¬ty.isBuiltin) : BaseIO TypeObject := do
+  let ref ← mkInitTypeRef (ty := ty)
+  have : LawfulType ref.toTypeRef.data := by simp_all
+  have : LawfulTypeRef ref.toTypeRef := .ofLawfulType (by simp) h
+  return .ofTypeRef ref

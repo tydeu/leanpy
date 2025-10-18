@@ -34,13 +34,33 @@ noncomputable def kind (self : ObjectData) : DataKind :=
 
 @[simp] theorem kind_mk  [TypeName α] {a : α} : kind (mk a) = typeName α := rfl
 
+def isOf [TypeName α] (a : α) (self : ObjectData) : Prop :=
+  self = .mk a
+
+@[simp] theorem isOf_mk  [TypeName α] {a : α} : (mk a).isOf a := rfl
+
+def isOfType (α) [TypeName α] (self : ObjectData) : Prop :=
+  ∃ (a : α), self = .mk a
+
+@[simp] theorem isOfType_mk  [TypeName α] {a : α} : (mk a).isOfType α :=
+  ⟨a, rfl⟩
+
+@[inline] private unsafe def getImpl'
+  [TypeName α] {p : α → Prop} (self : ObjectData)
+  (_ : ∃ (a : α), self.isOf a ∧ p a) : {a : α // p a}
+:= unsafeCast self
+
+@[implemented_by getImpl']
+opaque get'
+  [TypeName α] {p : α → Prop} (self : ObjectData)
+  (h : ∃ (a : α), self.isOf a ∧ p a) : {a : α // p a}
+:= let ⟨a, ⟨_, h⟩⟩ := Classical.indefiniteDescription _ h; ⟨a, h⟩
+
 @[inline] private unsafe def getImpl
-  [Nonempty α] [TypeName α]
-  (self : ObjectData) (_ : self.kind = typeName α) : α
+  [TypeName α] (self : ObjectData) (_ : self.isOfType α) : α
 := unsafeCast self
 
 @[implemented_by getImpl]
 opaque get
-  [Nonempty α] [TypeName α]
-  (self : ObjectData) (h : self.kind = typeName α)
-: α
+  [TypeName α] (self : ObjectData) (h : self.isOfType α)
+: α := Classical.choose h

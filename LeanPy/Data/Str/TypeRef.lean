@@ -26,8 +26,7 @@ def strType.doc : String := "\
   doc? := some strType.doc
   isStrSubclass := true
   base? := some objectTypeRef
-  IsValidObject id data :=
-    id.isNonScalar ∧ data.kind = typeName StringRef
+  IsValidObject id data := id.isNonScalar ∧ data.isOfType StringRef
 
 initialize strTypeRef.init : InitTypeRef strType ← initTypeRef
 

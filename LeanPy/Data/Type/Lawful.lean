@@ -3,6 +3,7 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
+import LeanPy.Data.Type.Mro
 import LeanPy.Data.Type.TypeRef
 import LeanPy.Data.Object.TypeRef
 import LeanPy.Data.Bool.TypeRef
@@ -14,22 +15,46 @@ namespace LeanPy
 
 /-! ## LawfulTypeRef -/
 
+class LawfulType (self : PyType) : Prop where
+  objectType_mem_baseMro : objectTypeRef ∈ self.baseMro
+  isTypeSubclass_iff :
+    self.isTypeSubclass ↔ self = typeTypeRef.data ∨ typeTypeRef ∈ self.baseMro
+  isIntSubclass_iff :
+    self.isIntSubclass ↔ self = intTypeRef.data ∨ intTypeRef ∈ self.baseMro
+  isStrSubclass_iff :
+    self.isStrSubclass ↔ self = strTypeRef.data ∨ strTypeRef ∈ self.baseMro
+  isValidObject_mro {id data} :
+    self.IsValidObject id data → ∀ {ty}, ty ∈ self.baseMro → ty.IsValidObject id data
+
+namespace PyType
+
+export LawfulType (
+  objectType_mem_baseMro
+  isIntSubclass_iff isTypeSubclass_iff isStrSubclass_iff
+  isValidObject_mro
+)
+
+end PyType
+
 class LawfulTypeRef (self : TypeRef) : Prop where
   isNonScalar_addr : self.addr % 2 = 0 := by simp
   subset_objectType : self ⊆ objectTypeRef := by
-    simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
+    simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff, TypeRef.eq_iff]
   isTypeSubclass_iff_subset :
     self.isTypeSubclass ↔ self ⊆ typeTypeRef := by
-      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
+      simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff, TypeRef.eq_iff]
   isIntSubclass_iff_subset :
     self.isIntSubclass ↔ self ⊆ intTypeRef := by
-      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
+      simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff, TypeRef.eq_iff]
   isStrSubclass_iff_subset :
     self.isStrSubclass ↔ self ⊆ strTypeRef := by
-      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
+      simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff, TypeRef.eq_iff]
   isValidObject_mro {id data} :
     self.IsValidObject id data → ∀ {ty}, self ⊆ ty → ty.IsValidObject id data
-  := by simp_all [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro]
+  := by simp_all [TypeRef.Subtype.iff_mem_mro, TypeRef.mro_eq_cons_baseMro]
+
+theorem TypeRef.ne_of_data_ne (h : data self ≠ data other) : self ≠ other := by
+  simp [TypeRef.eq_iff, h]
 
 namespace TypeRef
 
@@ -89,3 +114,39 @@ instance : LawfulTypeRef noneTypeRef where
 instance : LawfulTypeRef strTypeRef where
 instance : LawfulTypeRef intTypeRef where
 instance : LawfulTypeRef boolTypeRef where
+
+theorem LawfulTypeRef.ofLawfulType {ty : TypeRef}
+  [LawfulType ty.data] (h_addr : ty.addr % 2 = 0) (h_user : ¬ty.isBuiltin)
+: LawfulTypeRef ty where
+  isNonScalar_addr := h_addr
+  subset_objectType := by
+    grind [TypeRef.Subtype.iff_mem_mro, TypeRef.mro_eq_cons_baseMro,
+      TypeRef.baseMro_eq_data_baseMro, LawfulType.objectType_mem_baseMro]
+  isTypeSubclass_iff_subset := by
+    have data_ne : ty.data ≠ typeType := by
+      match h:ty.data with | .mk .. => grind
+    have ty_ne : typeTypeRef ≠ ty := TypeRef.ne_of_data_ne data_ne.symm
+    simp [data_ne, ty_ne, TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff,
+      LawfulType.isTypeSubclass_iff, TypeRef.baseMro_eq_data_baseMro]
+  isIntSubclass_iff_subset := by
+    have data_ne : ty.data ≠ intType := by
+      match h:ty.data with | .mk .. => grind
+    have ty_ne : intTypeRef ≠ ty := TypeRef.ne_of_data_ne data_ne.symm
+    simp [data_ne, ty_ne, TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff,
+      LawfulType.isIntSubclass_iff, TypeRef.baseMro_eq_data_baseMro]
+  isStrSubclass_iff_subset := by
+    have data_ne : ty.data ≠ strType := by
+      match h:ty.data with | .mk .. => grind
+    have ty_ne : strTypeRef ≠ ty := TypeRef.ne_of_data_ne data_ne.symm
+    simp [data_ne, ty_ne,TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff,
+      LawfulType.isStrSubclass_iff, TypeRef.baseMro_eq_data_baseMro]
+  isValidObject_mro := by
+    intro id data
+    simp only [
+      TypeRef.IsValidObject,
+      TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff,
+      TypeRef.baseMro_eq_data_baseMro, forall_eq_or_imp]
+    intro h
+    apply And.intro h
+    apply LawfulType.isValidObject_mro
+    exact h

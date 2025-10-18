@@ -29,8 +29,7 @@ def intType.doc : String := "\
   doc? := some intType.doc
   isIntSubclass := true
   base? := some objectTypeRef
-  IsValidObject _ data :=
-    data.kind = typeName IntRef -- TODO: id.isInt
+  IsValidObject _ data := data.isOfType IntRef -- TODO: id.isInt
 
 initialize intTypeRef.init : InitTypeRef intType ← initTypeRef
 

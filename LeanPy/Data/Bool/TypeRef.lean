@@ -22,10 +22,10 @@ def boolType.doc : String := "\
   isIntSubclass := true
   IsValidObject id data :=
     (id = .false ∨ id = .true) ∧
-    (id = .false → data = .mk (0 : IntRef)) ∧
-    (id = .true → data = .mk (1 : IntRef)) ∧
+    (id = .false → data.isOf (0 : IntRef)) ∧
+    (id = .true → data.isOf (1 : IntRef)) ∧
     -- redundant, but makes `simp_all` work in `LawfulType`
-    data.kind = typeName IntRef
+    data.isOfType IntRef
 
 initialize boolTypeRef.init : InitTypeRef boolType ← initTypeRef
 

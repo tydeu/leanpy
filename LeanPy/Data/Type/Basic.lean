@@ -37,6 +37,18 @@ structure PyType where
   -/
   isBaseType : Bool := true
   /--
+  Is this a builtin type?
+
+  This is used to provably distinguish builtin types with special properties
+  from user types.
+  -/
+  /-
+  Defaults to `true` because builtin types are explicitly constructed and thus
+  the default is convenient whereas user types use a smart constructor that sets
+  this to `false`.
+  -/
+  isBuiltin := true
+  /--
   Is this a subclass of `type`?
 
   Equivalent in functionality to CPython's `Py_TPFLAGS_TYPE_SUBCLASS`.

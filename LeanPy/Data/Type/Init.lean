@@ -26,7 +26,11 @@ instance : Nonempty (InitTypeRef ty) := ⟨⟨.null ty, rfl⟩⟩
 @[inline] def toTypeRef (self : InitTypeRef ty) : TypeRef :=
   ⟨self.toFrozenRef.cast self.data_eq⟩
 
-@[simp] theorem isNonScalar_addr_toRawTypeRef {self : InitTypeRef ty} :
+@[simp] theorem data_toTypeRef {self : InitTypeRef ty} :
+  self.toTypeRef.data = ty
+:= by simp [toTypeRef, TypeRef.data]
+
+@[simp] theorem isNonScalar_addr_toTypeRef {self : InitTypeRef ty} :
   self.toTypeRef.addr % 2 = 0
 := self.addr_mod_two
 

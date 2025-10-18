@@ -44,7 +44,7 @@ theorem isInt_toObject (self : PIntObject p) : self.toObject.isInt :=
   self.asInt self.isInt_toObject
 
 @[inline] def getIntRef (self : PIntObject p) : IntRef :=
-  self.getData self.lawful_subobject
+  self.data.get self.lawful_subobject
 
 @[inline] def getInt (self : PIntObject p) : Int :=
   self.getIntRef.toInt
@@ -77,7 +77,7 @@ def intTypeRef.slots : TObjectSlots IntObject where
   intTypeRef.slots.mkRef
 
 @[inline] def IntObject.ofIntRef (n : IntRef) : IntObject :=
-  intTypeRef.mkObject n.id  n
+  intTypeRef.mkObject n.id n
 
 instance : OfNat IntObject 0 := ⟨.ofIntRef 0⟩
 instance : Coe IntRef IntObject := ⟨.ofIntRef⟩

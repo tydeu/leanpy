@@ -17,8 +17,9 @@ def typeType.doc : String := "\
   doc? := some typeType.doc
   isTypeSubclass := true
   base? := some objectTypeRef
-  IsValidObject id data :=
-    id.isNonScalar ∧ data.kind = typeName RawTypeRef
+  -- NOTE: Validity of the data of the object
+  -- is shown through `Object.lawful_ty_data`
+  IsValidObject id _ := id.isNonScalar
 
 initialize typeTypeRef.init : InitTypeRef typeType ← initTypeRef
 

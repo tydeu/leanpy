@@ -37,7 +37,7 @@ theorem isStr_toObject (self : StrObject) : self.toObject.isStr :=
   self.ty.isStrSubclass_iff_subset.mpr self.ty_subset
 
 @[inline] def getStringRef (self : StrObject) : StringRef :=
-  self.getData (self.lawful_subobject).2
+  self.data.get (self.lawful_subobject).2
 
 @[inline] def getString (self : StrObject) : String :=
   self.getStringRef.data

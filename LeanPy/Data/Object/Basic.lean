@@ -31,10 +31,13 @@ structure Object.Raw where mk ::
 /-- A Python object. -/
 structure Object extends raw : Object.Raw where mk' ::
   [lawful_ty : LawfulTypeRef ty]
-  lawful_none : id = .none → ty = noneTypeRef := by simp
-  lawful_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp
+  lawful_ty_data : ty.isTypeSubclass →
+    ∃ (ty : TypeRef), data.isOf ty ∧ LawfulTypeRef ty
+  := by simp_all
+  lawful_none : id = .none → ty = noneTypeRef := by assumption
+  lawful_bool : id = .false ∨ id = .true → ty = boolTypeRef := by assumption
   lawful_slots : innerSlots.ty = ty := by simp
-  lawful_object : ty.data.IsValidObject id data := by simp
+  lawful_object : ty.data.IsValidObject id data := by assumption
 
 instance {self : Object} : LawfulTypeRef self.ty := self.lawful_ty
 
@@ -54,9 +57,6 @@ theorem lawful_subobject
   {self : Object} (h : self.ty ⊆ ty) : ty.IsValidObject self.id self.data
 := self.ty.isValidObject_mro self.lawful_object h
 
-@[inline] def getData
-  [Nonempty α] [TypeName α] (self : Object) (h : self.data.kind = typeName α)
-: α := self.data.get h
 
 /--
 Returns whether this object is the constant `None`.
@@ -207,20 +207,29 @@ end PObject
 
 /-! ## Object Constructor -/
 
-def TypeRef.mkObject
-  [TypeName α]
+namespace TypeRef
+
+def mkObjectCore
+  (id : ObjectId) (data : ObjectData)
   (ty : TypeRef) [LawfulTypeRef ty] [TypeSlots ty]
-  (id : ObjectId) (data : α)
+  (h : ty.IsValidObject id data := by simp)
+  (h_none : id = .none → ty = noneTypeRef := by simp)
+  (h_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp)
+  (h_ty_data : ty.isTypeSubclass →
+    ∃ (ty : TypeRef), data.isOf ty ∧ LawfulTypeRef ty := by simp)
+: SubObject ty := Object.toSubObject {id, ty, data}
+
+def mkObject
+  [TypeName α] (id : ObjectId) (data : α)
+  (ty : TypeRef) [LawfulTypeRef ty] [TypeSlots ty]
   (h : ty.IsValidObject id (.mk data) := by simp)
   (h_none : id = .none → ty = noneTypeRef := by simp)
   (h_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp)
-: SubObject ty := Object.toSubObject {
-  id, ty
-  data := ObjectData.mk data
-  lawful_none := h_none
-  lawful_bool := h_bool
-  lawful_object := h
-}
+  (h_ty_data : ty.isTypeSubclass →
+    ∃ (ty : TypeRef), (ObjectData.mk data).isOf ty ∧ LawfulTypeRef ty := by simp)
+: SubObject ty := Object.toSubObject  {id, ty, data := .mk data}
+
+end TypeRef
 
 /-! `PyM` -/
 
