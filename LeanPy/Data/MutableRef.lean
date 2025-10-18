@@ -12,6 +12,7 @@ A mutable data cell.
 
 Implemented as an `IO.Ref` with address information.
 -/
+-- TODO: Consider using a mutex
 abbrev MutableRef (α : Type) := NonScalarRef (IO.Ref α)
 
 @[inline] private unsafe def mkMutableRefImpl
@@ -25,6 +26,9 @@ namespace MutableRef
 
 @[inline] def get (self : MutableRef α) : BaseIO α :=
   self.data.get
+
+@[inline] def getAndMap (f : α → β) (self : MutableRef α) : BaseIO β :=
+  self.data.modifyGet fun a => (f a, a)
 
 @[inline] def set (a : α) (self : MutableRef α) : BaseIO Unit :=
   self.data.set a

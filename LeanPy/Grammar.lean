@@ -188,7 +188,7 @@ syntax:max (name := set)    "{" starNamedExpr,+,? "}" : pyExpr
 
 /- ### Dicts -/
 
-syntax kvpair := pyExpr ":" pyExpr
+syntax kvpair := pyExpr ": " pyExpr
 syntax doubleStarredKvpair := (("**" pyExpr:55) <|> kvpair)
 syntax:max (name := dict) "{" doubleStarredKvpair,*,? "}" : pyExpr
 

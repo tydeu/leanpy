@@ -239,8 +239,14 @@ abbrev AttrDict := HashDict AttrName Object
 -- TODO: Derive from `BaseException`
 abbrev ErrorObject := Object
 
-/-- Mutable dictionary. -/
-abbrev Dict := MutableRef (HashDict Object (MutableRef Object))
+/-- A mutable dictionary value at some key.. -/
+abbrev DictRef.Cell := MutableRef Object
+
+/-- The stored value of a mutable dictionary. -/
+abbrev DictRef.Data := HashDict Object Cell
+
+/-- A mutable reference to a dictionary. -/
+abbrev DictRef := MutableRef DictRef.Data
 
 /-- Mutable dictionary of variables. -/
 abbrev VarDict := MutableRef AttrDict

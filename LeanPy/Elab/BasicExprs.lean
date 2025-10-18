@@ -6,6 +6,7 @@ Authors: Mac Malone
 import LeanPy.Elab.Command
 import LeanPy.Data.None.Object
 import LeanPy.Data.Bool.Object
+import LeanPy.Data.Dict.Object
 import LeanPy.Data.Str.Object
 
 namespace LeanPy
@@ -39,6 +40,23 @@ def evalStrings : PyEval := fun stx => do
   let s := ss.foldl (init := "") fun s sStx =>
     s ++ sStx.getString
   mkStrObject s
+
+@[py_eval dict]
+def evalDict : PyEval := fun stx => do
+  let `(pyExpr| { $kvs:doubleStarredKvpair,* }) := stx
+    | throwError "ill-formed dict"
+  let d : DictRef.Data := ∅
+  let d ← kvs.getElems.foldlM (init := d) fun d stx => do
+    match stx with
+    | `(doubleStarredKvpair| ** $_) =>
+      throwError "iterable unpacking not yet implemented"
+    | `(doubleStarredKvpair| $k:pyExpr : $v:pyExpr) =>
+      let k ← evalPy k
+      let v ← evalPy v
+      d.set k v
+    | _ =>
+      throwError "ill-formed dict key-value pairs"
+  mkDictObject d
 
 /-! ## Basic Operations -/
 
