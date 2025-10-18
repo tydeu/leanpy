@@ -9,6 +9,7 @@ import LeanPy.Data.Bool.TypeRef
 import LeanPy.Data.Int.TypeRef
 import LeanPy.Data.None.TypeRef
 import LeanPy.Data.Str.TypeRef
+import LeanPy.Data.Dict.TypeRef
 
 namespace LeanPy
 
@@ -27,6 +28,9 @@ class LawfulTypeRef (self : TypeRef) : Prop where
   isStrSubclass_iff_subset :
     self.isStrSubclass ↔ self ⊆ strTypeRef := by
       simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
+  isDictSubclass_iff_subset :
+    self.isDictSubclass ↔ self ⊆ dictTypeRef := by
+      simp [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
   isValidObject_mro {id data} :
     self.IsValidObject id data → ∀ {ty}, self ⊆ ty → ty.IsValidObject id data
   := by simp_all [TypeRef.subset_iff_mem_mro, TypeRef.mro_eq_cons_baseMro]
@@ -35,7 +39,8 @@ namespace TypeRef
 
 export LawfulTypeRef (
   isNonScalar_addr subset_objectType
-  isTypeSubclass_iff_subset isIntSubclass_iff_subset isStrSubclass_iff_subset
+  isTypeSubclass_iff_subset isIntSubclass_iff_subset
+  isStrSubclass_iff_subset isDictSubclass_iff_subset
   isValidObject_mro
 )
 
@@ -71,6 +76,12 @@ end TypeRef
   strTypeRef.baseMro = [objectTypeRef]
 := rfl
 
+@[simp] theorem data_dictTypeRef : dictTypeRef.data = dictType := rfl
+
+@[simp] theorem baseMro_dictTypeRef :
+  dictTypeRef.baseMro = [objectTypeRef]
+:= rfl
+
 @[simp] theorem data_intTypeRef : intTypeRef.data = intType := rfl
 
 @[simp] theorem baseMro_intTypeRef :
@@ -87,5 +98,6 @@ instance : LawfulTypeRef objectTypeRef where
 instance : LawfulTypeRef typeTypeRef where
 instance : LawfulTypeRef noneTypeRef where
 instance : LawfulTypeRef strTypeRef where
+instance : LawfulTypeRef dictTypeRef where
 instance : LawfulTypeRef intTypeRef where
 instance : LawfulTypeRef boolTypeRef where

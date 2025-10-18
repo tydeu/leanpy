@@ -55,6 +55,12 @@ structure PyType where
   -/
   isIntSubclass : Bool := false
   /--
+  Is this a subclass of `dict`?
+
+  Equivalent in functionality to CPython's `Py_TPFLAGS_DICT_SUBCLASS`.
+  -/
+  isDictSubclass : Bool := false
+  /--
   Returns whether the field combination could be a valid object of this type.
 
   This can be an over-approximation. That is, it may hold for objects

@@ -12,6 +12,7 @@ A mutable data cell.
 
 Implemented as an `IO.Ref` with address information.
 -/
+-- TODO: Consider using a mutex
 abbrev MutableRef (α : Type) := NonScalarRef (IO.Ref α)
 
 @[inline] private unsafe def mkMutableRefImpl

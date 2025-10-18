@@ -22,17 +22,19 @@ instance : TypeName Unit := unsafe (.mk _ ``Unit)
 
 namespace ObjectData
 
+noncomputable def mkCore (kind : DataKind) (a : α) : ObjectData :=
+  {innerKind := kind, innerValue := unsafe unsafeCast a}
+
 @[inline] private unsafe def mkImpl [TypeName α] (a : α) : ObjectData :=
   unsafeCast a
 
 @[implemented_by mkImpl]
-def mk [TypeName α] (a : α) : ObjectData :=
-  {innerKind := typeName α, innerValue := unsafe unsafeCast a}
+abbrev mk [TypeName α] (a : α) : ObjectData := .mkCore (typeName α) a
 
 noncomputable def kind (self : ObjectData) : DataKind :=
   self.innerKind
 
-@[simp] theorem kind_mk  [TypeName α] {a : α} : kind (mk a) = typeName α := rfl
+@[simp] theorem kind_mkCore  [TypeName α] {a : α} : kind (mkCore n a) = n := rfl
 
 @[inline] private unsafe def getImpl
   [Nonempty α] [TypeName α]
@@ -40,7 +42,5 @@ noncomputable def kind (self : ObjectData) : DataKind :=
 := unsafeCast self
 
 @[implemented_by getImpl]
-opaque get
-  [Nonempty α] [TypeName α]
-  (self : ObjectData) (h : self.kind = typeName α)
-: α
+opaque get [Nonempty α] [TypeName α]
+  (self : ObjectData) (h : self.kind = typeName α) : α

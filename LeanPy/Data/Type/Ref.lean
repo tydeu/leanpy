@@ -43,6 +43,10 @@ abbrev isIntSubclass (self : TypeRef) : Bool :=
 abbrev isStrSubclass (self : TypeRef) : Bool :=
   self.data.isStrSubclass
 
+@[simp, inherit_doc PyType.isDictSubclass]
+abbrev isDictSubclass (self : TypeRef) : Bool :=
+  self.data.isDictSubclass
+
 @[simp, inherit_doc PyType.IsValidObject]
 abbrev IsValidObject (self : TypeRef) : ObjectProp.Raw :=
   self.data.IsValidObject

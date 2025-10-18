@@ -207,20 +207,31 @@ end PObject
 
 /-! ## Object Constructor -/
 
-def TypeRef.mkObject
+namespace TypeRef
+
+def mkObjectCore
+  (ty : TypeRef) [LawfulTypeRef ty] [TypeSlots ty]
+  (id : ObjectId) (data : ObjectData)
+  (h : ty.IsValidObject id data := by simp)
+  (h_none : id = .none → ty = noneTypeRef := by simp)
+  (h_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp)
+: SubObject ty := Object.toSubObject {
+  id, ty, data
+  lawful_none := h_none
+  lawful_bool := h_bool
+  lawful_object := h
+}
+
+def mkObject
   [TypeName α]
   (ty : TypeRef) [LawfulTypeRef ty] [TypeSlots ty]
   (id : ObjectId) (data : α)
   (h : ty.IsValidObject id (.mk data) := by simp)
   (h_none : id = .none → ty = noneTypeRef := by simp)
   (h_bool : id = .false ∨ id = .true → ty = boolTypeRef := by simp)
-: SubObject ty := Object.toSubObject {
-  id, ty
-  data := ObjectData.mk data
-  lawful_none := h_none
-  lawful_bool := h_bool
-  lawful_object := h
-}
+: SubObject ty := mkObjectCore ty id (.mk data) h h_none h_bool
+
+end TypeRef
 
 /-! `PyM` -/
 
@@ -229,6 +240,8 @@ abbrev AttrDict := HashDict AttrName Object
 /-- A Python exception. -/
 -- TODO: Derive from `BaseException`
 abbrev ErrorObject := Object
+
+abbrev Dict.Val := HashDict Object (MutableRef Object)
 
 /-- Mutable dictionary. -/
 abbrev Dict := MutableRef (HashDict Object (MutableRef Object))

@@ -58,6 +58,17 @@ open LeanPy
 /-- info: <class 'bool'> -/
 #guard_msgs in #eval_py bool
 
+/-! ## Dictionaries -/
+
+/-- info: {'a': 0, 'b': 1} -/
+#guard_msgs in #eval_py {"a": 0, "b": 1}
+
+/-- info: {'b': 1, 'a': 0} -/
+#guard_msgs in #eval_py {"b": 1, "a": 0}
+
+/-- info: True -/
+#guard_msgs in #eval_py {"a": 0, "b": 1} == {"b": 1, "a": 0}
+
 /-! ## Comparisons -/
 
 /-- info: False -/
