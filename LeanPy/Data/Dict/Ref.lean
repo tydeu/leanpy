@@ -18,8 +18,7 @@ namespace Data
 def set (k : Object) (v : Object) (self : Data) : PyM Data := do
   let hash ← k.hashM
   let cell ← mkMutableRef v
-  let self ← self.raw.insertCoreM hash k cell (.up <$> k.beqM ·)
-  return ⟨self⟩
+  self.insertCoreM hash k cell (.up <$> k.beqM ·)
 
 end Data
 
@@ -39,7 +38,7 @@ def beqM (a b : DictRef) : PyM Bool := do
   for entry in a.entries do
     let .some ah ak av := entry
       | continue
-    let ⟨bi⟩ ← b.raw.getEntryIdxCoreM ah (.up <$> ak.beqM ·)
+    let ⟨bi⟩ ← b.getEntryIdxCoreM ah (.up <$> ak.beqM ·)
     let some (.some _ _ bv) := b.entries[bi]?
       | return false
     let av ← av.get

@@ -233,7 +233,7 @@ end TypeRef
 
 /-! `PyM` -/
 
-abbrev AttrDict := HashDict AttrName Object
+abbrev AttrDict := TDict AttrName Object
 
 /-- A Python exception. -/
 -- TODO: Derive from `BaseException`
@@ -243,7 +243,7 @@ abbrev ErrorObject := Object
 abbrev DictRef.Cell := MutableRef Object
 
 /-- The stored value of a mutable dictionary. -/
-abbrev DictRef.Data := HashDict Object Cell
+abbrev DictRef.Data := TDict Object Cell
 
 /-- A mutable reference to a dictionary. -/
 abbrev DictRef := MutableRef DictRef.Data

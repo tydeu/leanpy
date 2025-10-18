@@ -61,11 +61,11 @@ scoped syntax (name := evalPyCmd) withPosition("#eval_py" Grammar.block) : comma
 def mkPyContext : BaseIO PyContext := do
   let globals := -- TODO: proper built-ins
     (∅ : AttrDict)
-    |>.insert "object" objectTypeRef
-    |>.insert "type" typeTypeRef
-    |>.insert "str" strTypeRef
-    |>.insert "int" intTypeRef
-    |>.insert "bool" boolTypeRef
+    |>.push "object" objectTypeRef
+    |>.push "type" typeTypeRef
+    |>.push "str" strTypeRef
+    |>.push "int" intTypeRef
+    |>.push "bool" boolTypeRef
   let globals ← mkMutableRef globals
   return {globals}
 
