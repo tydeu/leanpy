@@ -4,10 +4,9 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 syntax Authors Mac Malone
 -/
 import Std.Data.DHashMap.Internal.Index
+import LeanPy.Data.Hash
 
 namespace LeanPy
-
-abbrev Hash := UInt64
 
 namespace TDict
 

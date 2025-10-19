@@ -4,7 +4,7 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
 import LeanPy.Data.Object.Slots
-import LeanPy.Data.Str.Repr
+import LeanPy.Data.Str.Basic
 
 namespace LeanPy
 
@@ -52,7 +52,7 @@ theorem isStr_toObject (self : StrObject) : self.toObject.isStr :=
   self.getString != other.getString
 
 @[inline] protected def hash (self : StrObject) : Hash :=
-  hash self.getString -- TODO: salt hash?
+  strHash self.getString
 
 @[inline] def length (self : StrObject) : Nat :=
   self.getString.length

@@ -4,6 +4,7 @@ Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
 import LeanPy.Data.None.Object
+import LeanPy.Data.Str.Object
 import LeanPy.Data.Object.Slots
 
 namespace LeanPy
@@ -13,14 +14,44 @@ namespace LeanPy
 
 namespace DictRef
 
+@[inline] private def mkCell (data : Object) : BaseIO DictRef.Cell :=
+  mkMutableRef data
+
 namespace Data
 
+def pushByStr (k : String) (v : Object) (self : Data) : BaseIO Data := do
+  return self.pushCore (strHash k) (← mkStrObject k) (← mkCell v)
+
+-- TODO: support `str` subclasses that override `__beq__`?
+def getCellByStr? (k : String) (self : Data) : Option Cell :=
+  let i := ULift.down.{0} <| Id.run <| self.getEntryIdxCoreM (strHash k) fun k' =>
+    pure <| ULift.up <| k'.asStr?.any (·.getString == k)
+  if h : i < self.entries.size then
+    self.entries[i].value?
+  else none
+
+def setByStr (k : String) (v : Object) (self : Data) : PyM Data := do
+  self.insertCoreM (strHash k) (← mkStrObject k) (← mkCell v) fun k' =>
+    pure <| ULift.up <| k'.asStr?.any (·.getString == k)
+
 def set (k : Object) (v : Object) (self : Data) : PyM Data := do
-  let hash ← k.hashM
-  let cell ← mkMutableRef v
-  self.insertCoreM hash k cell (.up <$> k.beqM ·)
+  self.insertCoreM (← k.hashM) k (← mkCell v) (.up <$> ·.beqM k)
 
 end Data
+
+def getByStr? (k : String) (self : DictRef) : BaseIO (Option Object) := do
+  let some cell ← self.getAndMap (·.getCellByStr? k)
+    | return none
+  cell.get
+
+def setByStr (k : String) (v : Object) (self : DictRef) : PyM Unit := do
+  -- thread-safe path where a cell already exists
+  if let some cell ← self.getAndMap (·.getCellByStr? k) then
+    cell.set v
+  else -- TODO: consider mutex here (when multi-threading leanpy)
+    let data ← self.get
+    let data ← data.pushByStr k v
+    self.set data
 
 /--
 Returns `true` if the two dictionaries are equal.

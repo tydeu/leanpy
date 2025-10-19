@@ -5,6 +5,7 @@ Authors: Mac Malone
 -/
 import LeanPy.Grammar
 import LeanPy.Data.Type.Object
+import LeanPy.Data.Dict.Ref
 import LeanPy.Util.Elab
 
 open Lean Elab Command Parser
@@ -59,14 +60,14 @@ open Grammar
 scoped syntax (name := evalPyCmd) withPosition("#eval_py" Grammar.block) : command
 
 def mkPyContext : BaseIO PyContext := do
-  let globals := -- TODO: proper built-ins
-    (∅ : AttrDict)
-    |>.push "object" objectTypeRef
-    |>.push "type" typeTypeRef
-    |>.push "str" strTypeRef
-    |>.push "int" intTypeRef
-    |>.push "bool" boolTypeRef
-  let globals ← mkMutableRef globals
+  let globals ← -- TODO: proper built-ins
+    pure (∅ : DictRef.Data)
+    >>= (·.pushByStr "object" objectTypeRef)
+    >>= (·.pushByStr "type" typeTypeRef)
+    >>= (·.pushByStr "str" strTypeRef)
+    >>= (·.pushByStr "int" intTypeRef)
+    >>= (·.pushByStr "bool" boolTypeRef)
+  let globals ← mkDictRef globals
   return {globals}
 
 @[command_elab evalPyCmd]

@@ -3,11 +3,14 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
+import LeanPy.Data.Hash
 import LeanPy.Util.String
 
 namespace LeanPy
 
-/-! ## `str` Objects -/
+/-- Returns the LeanPy hash of a string. -/
+@[inline] def strHash (s : String) : Hash :=
+  hash s -- TODO: salt hash?
 
 /-- Returns the Python string representation of a `String`. -/
 def strRepr (s : String) : String :=
