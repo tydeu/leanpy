@@ -10,6 +10,7 @@ import LeanPy.Data.Bool.TypeRef
 import LeanPy.Data.Int.TypeRef
 import LeanPy.Data.None.TypeRef
 import LeanPy.Data.Str.TypeRef
+import LeanPy.Data.Tuple.TypeRef
 import LeanPy.Data.Dict.TypeRef
 
 namespace LeanPy
@@ -24,6 +25,8 @@ class LawfulType (self : PyType) : Prop where
     self.isIntSubclass ↔ self = intTypeRef.data ∨ intTypeRef ∈ self.baseMro
   isStrSubclass_iff :
     self.isStrSubclass ↔ self = strTypeRef.data ∨ strTypeRef ∈ self.baseMro
+  isTupleSubclass_iff :
+    self.isTupleSubclass ↔ self = tupleTypeRef.data ∨ tupleTypeRef ∈ self.baseMro
   isDictSubclass_iff :
     self.isDictSubclass ↔ self = dictTypeRef.data ∨ dictTypeRef ∈ self.baseMro
   isValidObject_mro {id data} :
@@ -34,6 +37,7 @@ namespace PyType
 export LawfulType (
   objectType_mem_baseMro
   isIntSubclass_iff isTypeSubclass_iff isStrSubclass_iff
+  isTupleSubclass_iff isDictSubclass_iff
   isValidObject_mro
 )
 
@@ -52,6 +56,9 @@ class LawfulTypeRef (self : TypeRef) : Prop where
   isStrSubclass_iff_subset :
     self.isStrSubclass ↔ self ⊆ strTypeRef := by
       simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff, TypeRef.eq_iff]
+  isTupleSubclass_iff_subset :
+    self.isTupleSubclass ↔ self ⊆ tupleTypeRef := by
+      simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
   isDictSubclass_iff_subset :
     self.isDictSubclass ↔ self ⊆ dictTypeRef := by
       simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mro_eq_cons_baseMro, TypeRef.eq_iff]
@@ -66,8 +73,8 @@ namespace TypeRef
 
 export LawfulTypeRef (
   isNonScalar_addr subset_objectType
-  isTypeSubclass_iff_subset isIntSubclass_iff_subset
-  isStrSubclass_iff_subset isDictSubclass_iff_subset
+  isTypeSubclass_iff_subset isIntSubclass_iff_subset isStrSubclass_iff_subset
+  isTupleSubclass_iff_subset isDictSubclass_iff_subset
   isValidObject_mro
 )
 
@@ -103,6 +110,12 @@ end TypeRef
   strTypeRef.baseMro = [objectTypeRef]
 := rfl
 
+@[simp] theorem data_tupleTypeRef : tupleTypeRef.data = tupleType := rfl
+
+@[simp] theorem baseMro_tupleTypeRef :
+  tupleTypeRef.baseMro = [objectTypeRef]
+:= rfl
+
 @[simp] theorem data_dictTypeRef : dictTypeRef.data = dictType := rfl
 
 @[simp] theorem baseMro_dictTypeRef :
@@ -125,6 +138,7 @@ instance : LawfulTypeRef objectTypeRef where
 instance : LawfulTypeRef typeTypeRef where
 instance : LawfulTypeRef noneTypeRef where
 instance : LawfulTypeRef strTypeRef where
+instance : LawfulTypeRef tupleTypeRef where
 instance : LawfulTypeRef dictTypeRef where
 instance : LawfulTypeRef intTypeRef where
 instance : LawfulTypeRef boolTypeRef where
@@ -148,6 +162,12 @@ theorem LawfulTypeRef.ofLawfulType {ty : TypeRef}
     have ty_ne : intTypeRef ≠ ty := TypeRef.ne_of_data_ne data_ne.symm
     simp [data_ne, ty_ne, TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff,
       LawfulType.isIntSubclass_iff, TypeRef.baseMro_eq_data_baseMro]
+  isTupleSubclass_iff_subset := by
+    have data_ne : ty.data ≠ tupleType := by
+      match h:ty.data with | .mk .. => grind
+    have ty_ne : tupleTypeRef ≠ ty := TypeRef.ne_of_data_ne data_ne.symm
+    simp [data_ne, ty_ne, TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff,
+      LawfulType.isTupleSubclass_iff, TypeRef.baseMro_eq_data_baseMro]
   isDictSubclass_iff_subset := by
     have data_ne : ty.data ≠ dictType := by
       match h:ty.data with | .mk .. => grind

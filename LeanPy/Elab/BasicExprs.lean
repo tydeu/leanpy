@@ -6,6 +6,7 @@ Authors: Mac Malone
 import LeanPy.Elab.Command
 import LeanPy.Data.None.Object
 import LeanPy.Data.Bool.Object
+import LeanPy.Data.Tuple.Object
 import LeanPy.Data.Dict.Object
 import LeanPy.Data.Str.Object
 
@@ -39,7 +40,30 @@ def evalStrings : PyEval := fun stx => do
     | throwError "ill-formed strings"
   let s := ss.foldl (init := "") fun s sStx =>
     s ++ sStx.getString
-  mkStrObject s
+  if s.isEmpty then
+    return StrObject.empty
+  else
+    mkStrObject s
+
+@[py_eval tuple]
+def evalTuple : PyEval := fun stx => do
+  let `(pyExpr| ($[$body?]?)) := stx
+    | throwError "ill-formed tuple"
+  let some body := body?
+    | return TupleObject.empty
+  let `(tupleBody| $init , $items,*) := body
+    | throwError "ill-formed tuple"
+  let init ← go #[] init
+  let data ← items.getElems.foldlM go init
+  mkTupleObject data
+where go os stx := do
+  match stx with
+  | `(starNamedExpr| * $_) =>
+    throwError "iterable unpacking not yet implemented"
+  | `(starNamedExpr| $x:namedExpr) =>
+    os.push <$> evalPy x
+  | _ =>
+    throwError "ill-formed tuple item"
 
 @[py_eval dict]
 def evalDict : PyEval := fun stx => do

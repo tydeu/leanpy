@@ -76,8 +76,16 @@ def strTypeRef.slots : TObjectSlots StrObject where
 @[instance] initialize strTypeSlotsRef : TypeSlots strTypeRef ←
   strTypeRef.slots.mkRef
 
-@[inline] def StrObject.ofStringRef (r : StringRef) : StrObject :=
+namespace StrObject
+
+@[inline] def ofStringRef (r : StringRef) : StrObject :=
   strTypeRef.mkObject r.id  r
+
+def empty : StrObject := .ofStringRef .empty
+
+instance : EmptyCollection StrObject := ⟨StrObject.empty⟩
+
+end StrObject
 
 @[inline] def mkStrObject (s : String) : BaseIO StrObject := do
   StrObject.ofStringRef <$> mkStringRef s

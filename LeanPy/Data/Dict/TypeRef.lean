@@ -19,7 +19,6 @@ def dictType.doc : String := "\
       in the keyword argument list.  For example:  dict(one=1, two=2)\
   "
 
--- TODO: replace with something more sound
 def dictDataKind : DataKind := `LeanPy.Dict
 
 @[reducible] def dictType : PyType where

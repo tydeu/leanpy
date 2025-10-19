@@ -65,6 +65,8 @@ def mkPyContext : BaseIO PyContext := do
     >>= (·.pushByStr "object" objectTypeRef)
     >>= (·.pushByStr "type" typeTypeRef)
     >>= (·.pushByStr "str" strTypeRef)
+    >>= (·.pushByStr "tuple" tupleTypeRef)
+    >>= (·.pushByStr "dict" dictTypeRef)
     >>= (·.pushByStr "int" intTypeRef)
     >>= (·.pushByStr "bool" boolTypeRef)
   let globals ← mkDictRef globals

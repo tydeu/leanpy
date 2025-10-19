@@ -100,7 +100,7 @@ def dictTypeRef.slots : TObjectSlots DictObject where
   beq self other :=
     if let some other := other.asDict? then self.beqM other else return false
   bne self other :=
-    if let some other := other.asDict? then self.beqM other else return true
+    if let some other := other.asDict? then self.bneM other else return true
   bool self := self.toBoolM
   repr self := self.reprM
 

@@ -11,13 +11,22 @@ abbrev StringRef := NonScalarRef String
 
 instance : TypeName StringRef := unsafe (.mk _ ``StringRef)
 
-@[inline] private unsafe def mkStringRefImpl
-  (s : String) : BaseIO {r : StringRef // r.data = s}
-:= pure (unsafeCast s)
+instance : Nonempty {r : StringRef // r.data = data} :=
+  ⟨NonScalarRef.null data, NonScalarRef.data_null⟩
 
-@[implemented_by mkStringRefImpl]
+@[inline]
 opaque mkStringRef' (s : String) : BaseIO {r : StringRef // r.data = s} :=
-  pure ⟨NonScalarRef.null s, NonScalarRef.data_null⟩
+  pure (unsafe unsafeCast s)
 
 @[inline] def mkStringRef (s : String) : BaseIO StringRef := do
   Subtype.val <$> mkStringRef' s
+
+namespace StringRef
+
+initialize empty' : {r : StringRef // r.data = ""} ← mkStringRef' _
+
+@[inline] def empty : StringRef := empty'.val
+
+@[simp] theorem data_empty : empty.data = "" := empty'.property
+
+instance : EmptyCollection StringRef := ⟨empty⟩

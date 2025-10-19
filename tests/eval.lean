@@ -38,6 +38,15 @@ open LeanPy
 -- smallest platform-independent big int
 #guard_msgs in #eval_py 4294967296
 
+/-- info: True -/
+#guard_msgs in #eval_py 0 is 0
+
+/-- info: False -/
+#guard_msgs in #eval_py 4294967296 is 4294967296
+
+/-- info: True -/
+#guard_msgs in #eval_py "" is ""
+
 /-- info: 'helloworld' -/
 #guard_msgs in #eval_py "hello" "world"
 
@@ -52,13 +61,54 @@ open LeanPy
 /-- info: <class 'str'> -/
 #guard_msgs in #eval_py str
 
+/-- info: <class 'tuple'> -/
+#guard_msgs in #eval_py tuple
+
+/-- info: <class 'dict'> -/
+#guard_msgs in #eval_py dict
+
 /-- info: <class 'int'> -/
 #guard_msgs in #eval_py int
 
 /-- info: <class 'bool'> -/
 #guard_msgs in #eval_py bool
 
+/-! ## Tuples -/
+
+/-- info: () -/
+#guard_msgs in #eval_py ()
+
+/-- info: True -/
+#guard_msgs in #eval_py () is ()
+
+/-- info: (0,) -/
+#guard_msgs in #eval_py (0,)
+
+/-- info: ('a', 'b') -/
+#guard_msgs in #eval_py ("a", "b")
+
+/-- info: ('a', 'b') -/
+#guard_msgs in #eval_py "a", "b"
+
+/-- info: True -/
+#guard_msgs in #eval_py ("a", "b") == ("a", "b")
+
+/-- info: False -/
+#guard_msgs in #eval_py ("a", "b") != ("a", "b")
+
+/-- info: False -/
+#guard_msgs in #eval_py ("a", "b") == ("b", "a")
+
+/-- info: True -/
+#guard_msgs in #eval_py ("a", "b") != ("b", "a")
+
 /-! ## Dictionaries -/
+
+/-- info: {} -/
+#guard_msgs in #eval_py {}
+
+/-- info: False -/ -- as CPython expects
+#guard_msgs in #eval_py {} is {}
 
 /-- info: {'a': 0, 'b': 1} -/
 #guard_msgs in #eval_py {"a": 0, "b": 1}
@@ -68,6 +118,15 @@ open LeanPy
 
 /-- info: True -/
 #guard_msgs in #eval_py {"a": 0, "b": 1} == {"b": 1, "a": 0}
+
+/-- info: False -/
+#guard_msgs in #eval_py {"a": 0, "b": 1} != {"b": 1, "a": 0}
+
+/-- info: False -/
+#guard_msgs in #eval_py {"a": 0, "b": 1} == {"b": 0, "a": 1}
+
+/-- info: True -/
+#guard_msgs in #eval_py {"a": 0, "b": 1} != {"b": 0, "a": 1}
 
 /-! ## Comparisons -/
 

@@ -5,6 +5,7 @@ Authors: Mac Malone
 -/
 import LeanPy.Elab.Command
 import LeanPy.Data.None.Object
+import LeanPy.Data.Tuple.Object
 
 namespace LeanPy
 
@@ -55,13 +56,13 @@ def evalStarExprs : PyEval := fun stx => do
   if h : vs.size = 1 then
     return vs[0]
   else
-    throwError "tuples not yet implemented"
+    mkTupleObject vs
 
 @[py_eval namedExpr]
 def evalNamedExpr : PyEval := fun stx => do
   match stx with
   | `(namedExpr| $x:assignmentExpr) =>
-    evalPy x
+    evalPy x -- TODO: perform assignment
   | `(namedExpr| $x:pyExpr) =>
     evalPy x
   | _ =>

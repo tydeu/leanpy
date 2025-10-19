@@ -181,9 +181,11 @@ syntax:20 (name := lambdef) "lambda " [lambdaParams] ":" pyExpr : pyExpr
 
 /- ## Literals -/
 
+syntax tupleBody := starNamedExpr "," starNamedExpr,*,?
+
 syntax:max (name := strings) str+ : pyExpr
 syntax:max (name := list)   "[" starNamedExpr,*,? "]" : pyExpr
-syntax:max (name := tuple)  "(" [starNamedExpr "," starNamedExpr,*,?] ")" : pyExpr
+syntax:max (name := tuple)  "(" [tupleBody] ")" : pyExpr
 syntax:max (name := set)    "{" starNamedExpr,+,? "}" : pyExpr
 
 /- ### Dicts -/

@@ -67,6 +67,12 @@ structure PyType where
   -/
   isIntSubclass : Bool := false
   /--
+  Is this a subclass of `tuple`?
+
+  Equivalent in functionality to CPython's `Py_TPFLAGS_TUPLE_SUBCLASS`.
+  -/
+  isTupleSubclass : Bool := false
+  /--
   Is this a subclass of `dict`?
 
   Equivalent in functionality to CPython's `Py_TPFLAGS_DICT_SUBCLASS`.
