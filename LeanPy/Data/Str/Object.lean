@@ -36,11 +36,11 @@ instance : Coe StrObject Object := ⟨PObject.toObject⟩
 theorem isStr_toObject (self : StrObject) : self.toObject.isStr :=
   self.ty.isStrSubclass_iff_subset.mpr self.ty_subset
 
-@[inline] def getStringRef (self : StrObject) : StringRef :=
+@[inline] def getStrRef (self : StrObject) : StrRef :=
   self.data.get (self.lawful_subobject).2
 
 @[inline] def getString (self : StrObject) : String :=
-  self.getStringRef.data
+  self.getStrRef.data
 
 @[inline] protected def toString (self : StrObject) : String :=
   self.getString
@@ -78,14 +78,14 @@ def strTypeRef.slots : TObjectSlots StrObject where
 
 namespace StrObject
 
-@[inline] def ofStringRef (r : StringRef) : StrObject :=
+@[inline] def ofStrRef (r : StrRef) : StrObject :=
   strTypeRef.mkObject r.id  r
 
-def empty : StrObject := .ofStringRef .empty
+def empty : StrObject := .ofStrRef .empty
 
 instance : EmptyCollection StrObject := ⟨StrObject.empty⟩
 
 end StrObject
 
 @[inline] def mkStrObject (s : String) : BaseIO StrObject := do
-  StrObject.ofStringRef <$> mkStringRef s
+  StrObject.ofStrRef <$> mkStrRef s

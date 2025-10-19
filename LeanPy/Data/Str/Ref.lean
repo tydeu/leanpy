@@ -7,26 +7,27 @@ import LeanPy.Data.NonScalarRef
 
 namespace LeanPy
 
-abbrev StringRef := NonScalarRef String
+/-- An immutable reference to a string. -/
+abbrev StrRef := NonScalarRef String
 
-instance : TypeName StringRef := unsafe (.mk _ ``StringRef)
+instance : TypeName StrRef := unsafe (.mk _ ``StrRef)
 
-instance : Nonempty {r : StringRef // r.data = data} :=
+instance : Nonempty {r : StrRef // r.data = data} :=
   ⟨NonScalarRef.null data, NonScalarRef.data_null⟩
 
 @[inline]
-opaque mkStringRef' (s : String) : BaseIO {r : StringRef // r.data = s} :=
+opaque mkStrRef' (s : String) : BaseIO {r : StrRef // r.data = s} :=
   pure (unsafe unsafeCast s)
 
-@[inline] def mkStringRef (s : String) : BaseIO StringRef := do
-  Subtype.val <$> mkStringRef' s
+@[inline] def mkStrRef (s : String) : BaseIO StrRef := do
+  Subtype.val <$> mkStrRef' s
 
-namespace StringRef
+namespace StrRef
 
-initialize empty' : {r : StringRef // r.data = ""} ← mkStringRef' _
+initialize empty' : {r : StrRef // r.data = ""} ← mkStrRef' _
 
-@[inline] def empty : StringRef := empty'.val
+@[inline] def empty : StrRef := empty'.val
 
 @[simp] theorem data_empty : empty.data = "" := empty'.property
 
-instance : EmptyCollection StringRef := ⟨empty⟩
+instance : EmptyCollection StrRef := ⟨empty⟩
