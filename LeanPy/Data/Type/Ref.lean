@@ -7,6 +7,7 @@ import LeanPy.Data.Type.Basic
 
 namespace LeanPy
 
+/-- A Python type reference. -/
 structure TypeRef where
   toRawTypeRef : RawTypeRef
   deriving TypeName, Nonempty
@@ -15,7 +16,7 @@ namespace TypeRef
 
 instance : Coe TypeRef RawTypeRef := ⟨TypeRef.toRawTypeRef⟩
 
-@[inline] def addr (self : TypeRef) : USize :=
+@[inline] def addr (self : TypeRef) : Addr :=
   self.toRawTypeRef.addr
 
 @[inline] def data (self : TypeRef) : PyType :=
@@ -23,6 +24,9 @@ instance : Coe TypeRef RawTypeRef := ⟨TypeRef.toRawTypeRef⟩
 
 theorem eq_iff : a = b ↔ addr a = addr b ∧ data a = data b := by
   cases a; cases b; simp [addr, data, FrozenRef.eq_iff]
+
+theorem ne_of_data_ne (h : data self ≠ data other) : self ≠ other := by
+  simp [eq_iff, h]
 
 abbrev base? (self : TypeRef) : Option TypeRef :=
   self.data.base?.map (⟨·⟩)

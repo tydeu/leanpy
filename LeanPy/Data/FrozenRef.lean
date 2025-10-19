@@ -3,6 +3,7 @@ Copyright (c) 2025 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
 Authors: Mac Malone
 -/
+import LeanPy.Data.Addr
 
 namespace LeanPy
 
@@ -10,13 +11,13 @@ namespace LeanPy
 structure FrozenRef (α : Type u) where
   -- TODO: Not `private` due to https://github.com/leanprover/lean4/issues/10789
   innerMk ::
-    private innerAddr : USize
+    private innerAddr : Addr
     private innerData : α
   deriving Nonempty
 
 namespace FrozenRef
 
-noncomputable def mk (addr : USize) (data : α) : FrozenRef α :=
+noncomputable def mk (addr : Addr) (data : α) : FrozenRef α :=
   innerMk addr data
 
 attribute [deprecated "Do not use `innerMk` directly." (since := "always")] innerMk
@@ -34,12 +35,12 @@ def data (self : FrozenRef α) : α :=
 
 instance : CoeOut (FrozenRef α) α := ⟨data⟩
 
-@[inline] private unsafe def addrImpl (self : FrozenRef α) : USize :=
-  ptrAddrUnsafe self
+@[inline] private unsafe def addrImpl (self : FrozenRef α) : Addr :=
+  addrUnsafe self
 
 /-- The address of `data`. In the case of a scalar, this is its boxed value. -/
 @[implemented_by addrImpl]
-def addr (self : FrozenRef α) : USize :=
+def addr (self : FrozenRef α) : Addr :=
   self.innerAddr
 
 @[simp] theorem addr_mk : addr (mk n a) = n := by
@@ -79,7 +80,7 @@ abbrev cast
 @[inline, elab_as_elim, cases_eliminator, induction_eliminator]
 def elim
   {α : Type u} {motive : FrozenRef α → Sort v} (self : FrozenRef α)
-  (mk : (addr : USize) → (data : α) → motive (mk addr data))
+  (mk : (addr : Addr) → (data : α) → motive (mk addr data))
 : motive self := mk self.addr self.data
 
 end FrozenRef

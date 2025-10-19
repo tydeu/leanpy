@@ -31,8 +31,8 @@ instance : Nonempty (InitTypeRef ty) := ⟨⟨.null ty, rfl⟩⟩
 := by simp [toTypeRef, TypeRef.data]
 
 @[simp] theorem isNonScalar_addr_toTypeRef {self : InitTypeRef ty} :
-  self.toTypeRef.addr % 2 = 0
-:= self.addr_mod_two
+  self.toTypeRef.addr.isNonScalar
+:= self.isNonScalar_addr
 
 instance : CoeOut (InitTypeRef ty) TypeRef :=
   ⟨InitTypeRef.toTypeRef⟩

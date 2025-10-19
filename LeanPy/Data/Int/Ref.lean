@@ -32,37 +32,40 @@ theorem isSmallInt_zero : isSmallInt 0 :=
 theorem isSmallInt_one : isSmallInt 1 :=
   isSmallInt_of_lt (by decide)
 
-def smallIntAddr (n : Int) : USize :=
-  n.toInt32.toUInt32.toUSize <<< 1 ||| 1
+@[inline] private unsafe def smallIntAddrImpl (n : Int) (_ : isSmallInt n) : Addr :=
+  addrUnsafe n
 
-theorem toNat_smallIntAddr_lt : (smallIntAddr n).toNat < 8589934592 := by
+@[implemented_by smallIntAddrImpl]
+def smallIntAddr (n : Int) (h : isSmallInt n) : Addr :=
+  Addr.mk <| n.toInt32.toUInt32.toUSize <<< 1 ||| 1
+
+theorem toNat_smallIntAddr_lt : (smallIntAddr n h).toNat < 8589934592 := by
   have one_mod_numBits : 1 % System.Platform.numBits = 1 :=
     Nat.mod_eq_of_lt (Nat.lt_of_lt_of_le (by simp) System.Platform.le_numBits)
-  rw [smallIntAddr]
+  rw [smallIntAddr, Addr.toNat_mk]
   simp only [USize.toNat_or, USize.toNat_shiftLeft, USize.reduceToNat]
   refine Nat.or_lt_two_pow (n := 33) (Nat.mod_lt_of_lt ?_) (by simp)
   rw [one_mod_numBits, Nat.shiftLeft_eq, Nat.pow_one, UInt32.toNat_toUSize]
   have n_lt := n.toInt32.toUInt32.toNat_lt
   omega
 
-@[simp] theorem toNat_smallIntAddr_mod_two : (smallIntAddr n).toNat % 2 = 1 := by
+@[simp] theorem toNat_smallIntAddr_mod_two : (smallIntAddr n h).toNat % 2 = 1 := by
   simp [smallIntAddr]
 
-@[simp] theorem smallIntAddr_mod_two : smallIntAddr n % 2 = 1 := by
-  simp [← USize.toNat_inj, toNat_smallIntAddr_mod_two]
-
-theorem toNat_smallIntAddr_ne_zero : (smallIntAddr n).toNat ≠ 0 := by
-  simp only [smallIntAddr, USize.toNat_or, USize.reduceToNat]
+theorem toNat_smallIntAddr_ne_zero : (smallIntAddr n h).toNat ≠ 0 := by
+  simp only [smallIntAddr, Addr.toNat_mk, USize.toNat_or, USize.reduceToNat]
   simp only [Nat.ne_zero_iff_zero_lt, Nat.lt_of_succ_le Nat.right_le_or]
 
-theorem smallIntAddr_ne_zero : smallIntAddr n ≠ 0 := by
-  rw [ne_eq, ← USize.toNat_inj, ← ne_eq]
+theorem smallIntAddr_ne_zero : smallIntAddr n h ≠ 0 := by
+  rw [ne_eq, ← Addr.toNat_inj, ← ne_eq]
   exact toNat_smallIntAddr_ne_zero
 
 /-! ## Int Ref -/
 
 abbrev IntRef.WF (n : FrozenRef Int) : Prop :=
-  if isSmallInt n.data then n.addr = smallIntAddr n.data else n.addr % 2 = 0
+  if h : isSmallInt n.data then
+    n.addr = smallIntAddr n.data h
+  else n.addr.isNonScalar
 
 structure IntRef where
   toFrozenRef : FrozenRef Int
@@ -71,7 +74,7 @@ structure IntRef where
 
 namespace IntRef
 
-@[inline] def addr (n : IntRef) : USize :=
+@[inline] def addr (n : IntRef) : Addr :=
   n.toFrozenRef.addr
 
 @[simp] theorem addr_mk : addr (mk v h) = v.addr := rfl
@@ -88,25 +91,22 @@ instance : Coe IntRef Int := ⟨toInt⟩
 
 @[simp] theorem isSmall_mk : isSmall (mk n h) = isSmallInt n.data := rfl
 
-theorem addr_of_isSmall (h : isSmall n) : addr n = smallIntAddr n.toInt := by
-  let ⟨n, wf⟩  := n
-  simp only [isSmall_mk] at h
-  simpa [WF, h] using wf
-
-theorem addr_of_not_isSmall (h : ¬ isSmall n) : addr n % 2 = 0 := by
+theorem addr_of_isSmall (h : isSmall n) : addr n = smallIntAddr n.toInt h := by
   let ⟨n, wf⟩  := n
   simp only [isSmall_mk] at h
   simpa [WF, h] using wf
 
 theorem toNat_addr_of_not_isSmall (h : ¬ isSmall n) : (addr n).toNat % 2 = 0 := by
-  simpa [← USize.toNat_inj] using addr_of_not_isSmall h
+  let ⟨n, wf⟩  := n
+  simp only [isSmall_mk] at h
+  simpa [WF, h, Addr.isNonScalar_iff] using wf
 
 @[inline] private unsafe def ofSmallIntImpl (n : Int) (_ : isSmallInt n) : IntRef :=
   unsafeCast n
 
 @[implemented_by ofSmallIntImpl]
 def ofIsSmall (n : Int) (h : isSmallInt n) : IntRef :=
-  ⟨.mk (smallIntAddr n) n, by simp [IntRef.WF, h]⟩
+  ⟨.mk (smallIntAddr n h) n, by simp [IntRef.WF, h]⟩
 
 instance : OfNat IntRef 0 := ⟨.ofIsSmall 0 isSmallInt_zero⟩
 instance : OfNat IntRef 1 := ⟨.ofIsSmall 1 isSmallInt_one⟩

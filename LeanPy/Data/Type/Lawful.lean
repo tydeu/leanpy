@@ -44,7 +44,7 @@ export LawfulType (
 end PyType
 
 class LawfulTypeRef (self : TypeRef) : Prop where
-  isNonScalar_addr : self.addr % 2 = 0 := by simp
+  isNonScalar_addr : self.addr.isNonScalar := by simp
   subset_objectType : self ⊆ objectTypeRef := by
     simp [TypeRef.Subtype.iff_mem_mro, TypeRef.mem_mro_iff, TypeRef.eq_iff]
   isTypeSubclass_iff_subset :
@@ -65,9 +65,6 @@ class LawfulTypeRef (self : TypeRef) : Prop where
   isValidObject_mro {id data} :
     self.IsValidObject id data → ∀ {ty}, self ⊆ ty → ty.IsValidObject id data
   := by simp_all [TypeRef.Subtype.iff_mem_mro, TypeRef.mro_eq_cons_baseMro]
-
-theorem TypeRef.ne_of_data_ne (h : data self ≠ data other) : self ≠ other := by
-  simp [TypeRef.eq_iff, h]
 
 namespace TypeRef
 
@@ -144,7 +141,7 @@ instance : LawfulTypeRef intTypeRef where
 instance : LawfulTypeRef boolTypeRef where
 
 theorem LawfulTypeRef.ofLawfulType {ty : TypeRef}
-  [LawfulType ty.data] (h_addr : ty.addr % 2 = 0) (h_user : ¬ty.isBuiltin)
+  [LawfulType ty.data] (h_addr : ty.addr.isNonScalar) (h_user : ¬ty.isBuiltin)
 : LawfulTypeRef ty where
   isNonScalar_addr := h_addr
   subset_objectType := by

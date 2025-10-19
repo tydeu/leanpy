@@ -9,21 +9,21 @@ namespace LeanPy
 
 structure NonScalarRef (α : Type u) where
   toFrozenRef : FrozenRef α
-  wf : toFrozenRef.addr % 2 = 0
+  wf : toFrozenRef.addr.isNonScalar
 
 namespace NonScalarRef
 
 instance : Coe (NonScalarRef α) (FrozenRef α) := ⟨NonScalarRef.toFrozenRef⟩
 
-abbrev addr (n : NonScalarRef α) : USize :=
+abbrev addr (n : NonScalarRef α) : Addr :=
   n.toFrozenRef.addr
 
 @[simp] theorem addr_mk : addr (mk a h) = a.addr := rfl
 
-@[simp] theorem addr_mod_two : addr a % 2 = 0 := a.wf
+@[simp] theorem isNonScalar_addr : (addr a).isNonScalar := a.wf
 
-@[simp] theorem toNat_addr_mod_two : (addr a).toNat % 2 = 0 := by
-  simpa [← USize.toNat_inj, -addr_mod_two] using addr_mod_two
+@[simp] theorem toNat_addr_mod_two : (addr a).toNat % 2 = 0 :=
+  Addr.isNonScalar_iff.mp a.isNonScalar_addr
 
 abbrev data (n : NonScalarRef α) : α :=
   n.toFrozenRef.data
