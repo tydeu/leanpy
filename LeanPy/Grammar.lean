@@ -213,18 +213,23 @@ syntax:arg pyExpr:arg genexp : pyExpr
 
 /- ### Function Calls -/
 
-syntax kwarg := atomic(name " = ") pyExpr
+syntax kwArg := atomic(name "=") pyExpr
 
-syntax kwargs
-  | lookahead("**") (doubleStarredExpr <|> kwarg),+,?
-  | (starredExpr <|> kwarg),+,? [commaBefore (doubleStarredExpr <|> kwarg),+,?]
+syntax kwArgOrStarred := kwArg <|> starredExpr
+syntax kwArgOrDoubleStarred := kwArg <|> doubleStarredExpr
+
+syntax kwArgs
+  | skipInsideQuot(lookahead("**")) kwArgOrDoubleStarred,+,?
+  | kwArgOrStarred,+,? [skipInsideQuot(commaBefore) kwArgOrDoubleStarred,+,?]
+
+syntax arg :=
+  starredExpr <|> atomic(assignmentExpr <|> atomic(pyExpr !":=") !"=")
 
 syntax args
-  | (!("**" <|> kwarg) (starredExpr <|> assignmentExpr <|> (pyExpr !":=")) !"="),+,?
-    [commaBefore kwargs]
-  | kwargs
+  | (!atomic("**" <|> kwArg) arg,+,?) [skipInsideQuot(commaBefore) kwArgs]
+  | kwArgs
 
-syntax arguments := args lookahead(")")
+syntax arguments := atomic(args lookahead(")"))
 syntax:arg (name := callExpr) pyExpr:arg "(" [arguments] ")" : pyExpr
 
 /-! ## Assignment Targets -/

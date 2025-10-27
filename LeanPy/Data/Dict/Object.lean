@@ -5,7 +5,6 @@ Authors: Mac Malone
 -/
 import LeanPy.Data.Dict.Ref
 import LeanPy.Data.Object.Slots
-import LeanPy.Data.Str.Object
 
 namespace LeanPy
 
@@ -91,16 +90,13 @@ This is equivalent to the Python `dict.__repr__(self)`.
 
 end DictObject
 
-def throwUnhashableType (tyName : String) : PyM α := do
-  -- TODO: make this a TypeError
-  throw ((← mkStrObject s!"unhashable type: '{tyName}'") : ErrorObject)
-
 def dictTypeRef.slots : TObjectSlots DictObject where
-  hash _ := throwUnhashableType "dict"
+  hash self := throwUnhashableType self.ty.name
   beq self other :=
     if let some other := other.asDict? then self.beqM other else return false
   bne self other :=
     if let some other := other.asDict? then self.bneM other else return true
+  call self _ _ := throwNotCallable self.ty.name
   bool self := self.toBoolM
   repr self := self.reprM
 

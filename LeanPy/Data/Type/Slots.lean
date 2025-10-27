@@ -26,6 +26,8 @@ noncomputable def mk (ty : TypeRef) : TypeSlotsRef :=
 protected noncomputable def ty (self : TypeSlotsRef) : TypeRef :=
   self.innerTy
 
+@[simp] theorem ty_mk : (mk ty).ty = ty := rfl
+
 theorem ty_inj {a b : TypeSlotsRef} : a.ty = b.ty ↔ a = b := by
   cases a; cases b; simp [TypeSlotsRef.ty]
 

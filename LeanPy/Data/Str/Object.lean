@@ -69,6 +69,7 @@ def strTypeRef.slots : TObjectSlots StrObject where
   hash self := return self.hash
   beq self other := return other.asStr?.any self.beq
   bne self other := return other.asStr?.all self.bne
+  call self _ _ := throwNotCallable self.ty.name
   bool self := return self.toBool
   str self := return self.toString
   repr self := return self.repr

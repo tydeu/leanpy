@@ -110,6 +110,9 @@ open LeanPy
 /-- info: False -/ -- as CPython expects
 #guard_msgs in #eval_py {} is {}
 
+/-- info: {'a': 1} -/
+#guard_msgs in #eval_py {"a": 0, "a": 1}
+
 /-- info: {'a': 0, 'b': 1} -/
 #guard_msgs in #eval_py {"a": 0, "b": 1}
 
@@ -127,6 +130,26 @@ open LeanPy
 
 /-- info: True -/
 #guard_msgs in #eval_py {"a": 0, "b": 1} != {"b": 0, "a": 1}
+
+/-- error: str: unhashable type: 'dict' -/
+#guard_msgs in #eval_py {{}: None}
+
+/-! ## Function Calls -/
+
+/-- error: str: 'NoneType' object is not callable -/
+#guard_msgs in #eval_py None()
+
+/-- info: <class 'NoneType'> -/
+#guard_msgs in #eval_py type(None)
+
+/-- error: str: type() takes 1 or 3 arguments -/
+#guard_msgs in #eval_py type(0, 1)
+
+/-- error: str: type() takes 1 or 3 arguments -/
+#guard_msgs in #eval_py type(name="foo")
+
+/-- error: str: cannot create 'NoneType' instances -/
+#guard_msgs in #eval_py type(None)()
 
 /-! ## Comparisons -/
 

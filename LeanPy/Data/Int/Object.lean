@@ -70,6 +70,7 @@ def intTypeRef.slots : TObjectSlots IntObject where
   hash self := return self.hash
   beq self other := return other.asInt?.any self.beq
   bne self other := return other.asInt?.all self.bne
+  call self _ _ := throwNotCallable self.ty.name
   bool self := return self.toBool
   repr self := return self.repr
 

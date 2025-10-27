@@ -70,7 +70,11 @@ def mkPyContext : BaseIO PyContext := do
     >>= (·.pushByStr "int" intTypeRef)
     >>= (·.pushByStr "bool" boolTypeRef)
   let globals ← mkDictRef globals
-  return {globals}
+  return {
+    globals,
+    mkInternalError := (mkStrObject ·)
+    mkInternalTypeObject := TypeObject.ofTypeRef
+  }
 
 @[command_elab evalPyCmd]
 def elabEvalPyCmd : CommandElab := fun stx => do

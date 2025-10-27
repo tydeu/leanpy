@@ -15,6 +15,8 @@ structure TObjectSlots (α : Type u) where
   beq (self : α) (other : Object) : PyM Bool
   /-- The type's `!=` slot. Unlike `__ne__`, this returns `Bool`. -/
   bne (self : α) (other : Object) : PyM Bool := Bool.not <$> beq self other
+  /-- The type's `__call__` slot. -/
+  call (self : α) (args : Tuple) (kws? : Option DictRef) : PyM Object
   /-- The type's `__bool__` slot.  -/
   bool (self : α) : PyM Bool
   /-- The type's `__repr__` slot.  -/
@@ -38,10 +40,11 @@ namespace TObjectSlots
 @[implemented_by castImpl]
 def cast
   (h : ∀ {ty}, q ty → p ty) (slots : PObjectSlots p)
-: (PObjectSlots q) where
+: PObjectSlots q where
   hash self := slots.hash (self.cast (h self.property))
-  beq self other := slots.beq (self.cast (h self.property)) other
-  bne self other := slots.beq (self.cast (h self.property)) other
+  beq self := slots.beq (self.cast (h self.property))
+  bne self := slots.beq (self.cast (h self.property))
+  call self := slots.call (self.cast (h self.property))
   bool self := slots.bool (self.cast (h self.property))
   repr self := slots.repr (self.cast (h self.property))
   str self := slots.str (self.cast (h self.property))
@@ -91,6 +94,10 @@ namespace Object
 
 @[inline] def bneM (self other : Object) : PyM Bool := do
   (← self.getSlots).bne self.toSubObject other
+
+@[inline] def call
+  (self : Object) (args : Tuple := ∅) (kws? : Option DictRef := none)
+: PyM Object := do (← self.getSlots).call self.toSubObject args kws?
 
 @[inline] def reprM (self : Object) : PyM String := do
   (← self.getSlots).repr self.toSubObject

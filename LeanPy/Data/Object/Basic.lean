@@ -30,17 +30,24 @@ structure Object extends raw : Object.Raw where mk' ::
   [lawful_ty : LawfulTypeRef ty]
   lawful_ty_data : ty.isTypeSubclass →
     ∃ (ty : TypeRef), data.isOf ty ∧ LawfulTypeRef ty
-  := by simp_all
-  lawful_none : id = .none → ty = noneTypeRef := by assumption
-  lawful_bool : id = .false ∨ id = .true → ty = boolTypeRef := by assumption
-  lawful_slots : innerSlots.ty = ty := by simp
-  lawful_object : ty.data.IsValidObject id data := by assumption
+  := by  first | assumption | simp
+  lawful_none : id = .none → ty = noneTypeRef := by first | assumption | simp
+  lawful_bool : id = .false ∨ id = .true → ty = boolTypeRef := by  first | assumption | simp
+  lawful_slots : innerSlots.ty = ty := by  first | assumption | simp
+  lawful_object : ty.data.IsValidObject id data := by  first | assumption | simp
 
 instance {self : Object} : LawfulTypeRef self.ty := self.lawful_ty
 
 /-! ## Object Basics -/
 
 namespace Object
+
+instance : Nonempty Object := ⟨{
+  id := .none
+  ty := noneTypeRef
+  innerSlots := .mk noneTypeRef
+  data := .mk ()
+}⟩
 
 theorem eq_iff (self other : Object) :
   self = other ↔

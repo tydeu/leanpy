@@ -5,12 +5,7 @@ Authors: Mac Malone
 -/
 import LeanPy.Data.Object.Slots
 
-namespace LeanPy
-
-/-- A pure Python tuple. -/
-abbrev Tuple := Array Object
-
-namespace Tuple
+namespace LeanPy.Tuple
 
 /-- Returns the hash of the tuple. -/
 -- Should follow the logic in CPython's `tuplehash`

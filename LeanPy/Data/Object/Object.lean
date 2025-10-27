@@ -69,6 +69,7 @@ def objectTypeRef.slots : TObjectSlots ObjectObject where
   hash self := return self.hash
   beq self other := return self.beq other
   bne self other := return self.bne other
+  call self _ _ := throwNotCallable self.ty.name
   bool _ := return true
   repr self := return self.repr
 

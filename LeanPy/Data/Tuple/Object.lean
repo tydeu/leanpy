@@ -109,6 +109,7 @@ def tupleTypeRef.slots : TObjectSlots TupleObject where
     if let some other := other.asTuple? then self.beqM other else return false
   bne self other :=
     if let some other := other.asTuple? then self.bneM other else return true
+  call self _ _ := throwNotCallable self.ty.name
   bool self := return self.toBool
   repr self := self.reprM
 

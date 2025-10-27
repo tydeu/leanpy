@@ -58,6 +58,39 @@ def name (self : TypeObject) : String :=
   self.getType.name
 
 /--
+A function call on a type object.
+
+For `type` itself, it has two forms. With one argument, it returns the type
+of the object. With three arguments, it returns a  new type object.
+
+```text
+type(object) -> the object's type
+type(name, bases, dict, **kws) -> a new type
+```
+
+For other instances of `type` (e.g., `object`),
+it constructs an new instance of that type.
+
+This is equivalent to the Python `type.__call__(self, *args, **kws)`.
+-/
+-- Should follow the logic of CPython's `type_call`
+-- https://github.com/python/cpython/blob/3.11/Objects/typeobject.c#L1050
+def call (self : TypeObject) (args : Tuple) (kws? : Option DictRef) : PyM Object := do
+  -- Only `type` itself should support the one-argument form.
+  if self.id == typeTypeRef.id then
+    if (← noKws kws?) then
+      if h : args.size = 1 then
+        return ← mkInternalTypeObject args[0].ty
+      else if args.size = 3 then
+        return ← mkInstance args kws?
+    throwInternalTypeError "type() takes 1 or 3 arguments"
+  else
+    mkInstance args kws?
+where mkInstance _ _ :=
+  -- TODO: support creating instances
+  throwInternalTypeError s!"cannot create '{self.name}' instances"
+
+/--
 Returns a string representation of the type.
 
 This is equivalent to the Python `type.__repr__(self)`.
@@ -71,6 +104,7 @@ def typeTypeRef.slots : TObjectSlots TypeObject where
   hash self := return self.asObject.hash
   beq self other := return self.asObject.beq other
   bne self other := return self.asObject.bne other
+  call self args kwds? := self.call args kwds?
   bool _ := return true
   repr self := return self.repr
 
@@ -78,11 +112,6 @@ def typeTypeRef.slots : TObjectSlots TypeObject where
   typeTypeRef.slots.mkRef
 
 namespace TypeObject
-
--- def ofInitTypeRef (ref : InitTypeRef ty) : TypeObject :=
---   typeTypeRef.mkObject ref.id ref.toTypeRef
-
--- instance : CoeOut (InitTypeRef ty) TypeObject := ⟨ofInitTypeRef⟩
 
 def ofTypeRef (ty : TypeRef) [LawfulTypeRef ty] : TypeObject :=
   typeTypeRef.mkObject ty.id ty (h_ty_data := fun _ => ⟨ty, by simp_all⟩)

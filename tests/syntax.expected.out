@@ -11,7 +11,8 @@
             (LeanPy.Grammar.identExpr `f)
             "("
             [(LeanPy.Grammar.arguments
-              (LeanPy.Grammar.args (group [(group (group (LeanPy.Grammar.numExpr (num "1"))))] [])))]
+              (LeanPy.Grammar.args
+               (group [(LeanPy.Grammar.arg (group (group (LeanPy.Grammar.numExpr (num "1")))))] [])))]
             ")"))]))
        []))
      ";"
@@ -24,7 +25,7 @@
           (LeanPy.Grammar.identExpr `f)
           "("
           [(LeanPy.Grammar.arguments
-            (LeanPy.Grammar.args (group [(group (group (LeanPy.Grammar.numExpr (num "3"))))] [])))]
+            (LeanPy.Grammar.args (group [(LeanPy.Grammar.arg (group (group (LeanPy.Grammar.numExpr (num "3")))))] [])))]
           ")")))])]))
   (LeanPy.Grammar.stmt
    (LeanPy.Grammar.ifStmt
@@ -41,7 +42,7 @@
              (LeanPy.Grammar.identExpr `kill)
              "("
              [(LeanPy.Grammar.arguments
-               (LeanPy.Grammar.args (group [(group (group (LeanPy.Grammar.identExpr `pid)))] [])))]
+               (LeanPy.Grammar.args (group [(LeanPy.Grammar.arg (group (group (LeanPy.Grammar.identExpr `pid))))] [])))]
              ")"))])]))
       (LeanPy.Grammar.stmt
        (LeanPy.Grammar.simpleStmts

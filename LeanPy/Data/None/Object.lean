@@ -26,6 +26,7 @@ def noneTypeRef.slots : TObjectSlots NoneObject where
   hash _ := return NoneObject.hash
   beq _ other := return other.isNone
   bne _ other := return other.isNotNone
+  call self _ _ := throwNotCallable self.ty.name
   bool _ := return false
   repr _ := return NoneObject.repr
 
