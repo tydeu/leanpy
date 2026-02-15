@@ -16,6 +16,15 @@ where go self :=
   | {base? := some base, ..} => ⟨base⟩ :: go base.data
 termination_by structural self
 
+-- manual equational lemma due to lean4#12495
+-- https://github.com/leanprover/lean4/issues/12495
+private theorem RawTypeRef.baseMro.go_some :
+  go {
+    name, doc?, base? := some base,
+    isBaseType, isBuiltin, isTypeSubclass, isStrSubclass, isIntSubclass,
+    isTupleSubclass, isDictSubclass, IsValidObject
+  } = ⟨base⟩ :: go base.data := rfl
+
 /-- The type's method resolution order (excluding itself). -/
 @[inline] def PyType.baseMro (self : PyType) : List TypeRef :=
   self.base?.elim [] fun base => ⟨base⟩ :: RawTypeRef.baseMro base
@@ -37,11 +46,12 @@ theorem baseMro_eq_data_baseMro : baseMro self = self.data.baseMro := by
   cases self.data.base? <;> simp only [Option.elim, Option.map, mro]
 
 theorem mro_eq_cons_baseMro : mro self = self :: baseMro self := by
-  unfold mro RawTypeRef.baseMro RawTypeRef.baseMro.go
+  unfold mro RawTypeRef.baseMro -- RawTypRef.baseMro.go -- lean4#12495
   simp only [baseMro_eq_elim, Option.elim, Option.map, base?, data]
   match self.toRawTypeRef.data with
   | {base? := none, ..} => rfl
-  | {base? := some base, ..} => simp only [mro, RawTypeRef.baseMro]
+  | {base? := some base, ..} =>
+    simp only [mro, RawTypeRef.baseMro, RawTypeRef.baseMro.go_some]
 
 instance : SizeOf TypeRef := ⟨(·.baseMro.length)⟩
 

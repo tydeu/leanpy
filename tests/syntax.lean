@@ -1,6 +1,6 @@
 import LeanPy.Grammar
 
-syntax withPosition("#print_py" LeanPy.Grammar.block) : command
+syntax withPosition("#print_py" LeanPy.Grammar.pyBlock) : command
 
 macro_rules
 | `(#print_py $blk) =>

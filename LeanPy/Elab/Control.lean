@@ -48,14 +48,14 @@ def evalCondExpr : PyEval := fun stx => do
 
 @[py_eval ifStmt]
 def evalCondStmt : PyEval := fun stx => do
-  let `(ifStmt| if $c:namedExpr: $t:block $elifs* $[else: $e?:block]?) := stx
+  let `(ifStmt| if $c:namedExpr: $t:pyBlock $elifs* $[else: $e?:pyBlock]?) := stx
     | throwError "ill-formed if statement"
   let c ← evalPy c
   if (← c.toBoolM) then
     evalPy t
   else
     let r? ← elifs.findSomeM? fun stx => withRef stx do
-      let `(elifStmt| elif $c:namedExpr: $t:block) := stx
+      let `(elifStmt| elif $c:namedExpr: $t:pyBlock) := stx
         | throwError "ill-formed elif statment"
       let c ← evalPy c
       if (← c.toBoolM) then

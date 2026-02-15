@@ -14,12 +14,12 @@ open Grammar Lean
 def evalPySeq (xs : Array Syntax) : PyEvalM Object :=
   xs.foldlM (init := none) fun _ stx => evalPy stx
 
-@[py_eval block]
+@[py_eval pyBlock]
 def evalBlock : PyEval := fun stx => do
   match stx with
-  | `(Grammar.block| $[\]* $stmts:pySimpleStmt;*) =>
+  | `(pyBlock| $[\]* $stmts:pySimpleStmt;*) =>
     evalPySeq stmts.getElems
-  | `(Grammar.block| $stmts:stmt*) =>
+  | `(pyBlock| $stmts:stmt*) =>
     evalPySeq stmts
   | _ =>
     throwError "ill-formed block"

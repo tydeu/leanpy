@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2023 Mac Malone. All rights reserved.
 Released under the Apache 2.0 license as described in the file LICENSE.
-syntax Authors Mac Malone
+Authors: Mac Malone
 -/
 import LeanPy.Util.Parser
 
@@ -282,7 +282,7 @@ syntax typeExprs
   | pyExpr,+,? [commaBefore "*" pyExpr ("," <|> !"**")] [commaBefore "**" pyExpr]
 
 syntax funcTypeComment
-  | linebreak typeComment colGt -- SPEC NOTE: Must be followed by indented block
+  | linebreak typeComment colGt -- SPEC NOTE: Must be followed by indented pyBlock
   | typeComment
 
 /-! ## Statements -/
@@ -384,7 +384,8 @@ attribute [pySimpleStmt_parser] importFrom
 
 /-! ### Compound Statements -/
 
-syntax block
+-- named `pyBlock` to avoid a conflict with `Lean.Parser.Category.block`
+syntax pyBlock
   | ppSpace lineEq ("\\" lineEq)* simpleStmts
   | ppIndent(colGt withPosition(many1Indent(ppLine stmt)))
 
@@ -393,7 +394,7 @@ syntax decorator := "@" namedExpr linebreak
 /-! ### Class Definitions -/
 
 syntax classDefRaw :=
-  "class " name ["(" [arguments] ")"] ":" block
+  "class " name ["(" [arguments] ")"] ":" pyBlock
 
 syntax classDef :=
   withPosition(decorator* classDefRaw)
@@ -454,7 +455,7 @@ syntax params
   | starEtc
 
 syntax functionDefRaw :=
-  "async "? "def " name "(" [params] ")" [" -> " pyExpr] ":" [funcTypeComment] block
+  "async "? "def " name "(" [params] ")" [" -> " pyExpr] ":" [funcTypeComment] pyBlock
 
 syntax functionDef :=
   withPosition(decorator* functionDefRaw)
@@ -463,11 +464,11 @@ attribute [pyCompoundStmt_parser] functionDef
 
 /-! ### If Statement -/
 
-syntax elseBlock := "else" ":" block
-syntax elifStmt := "elif " namedExpr ":" block
+syntax elseBlock := "else" ":" pyBlock
+syntax elifStmt := "elif " namedExpr ":" pyBlock
 
 syntax ifStmt := withPosition $
-  "if " namedExpr ":" block
+  "if " namedExpr ":" pyBlock
   (skipInsideQuot(colEq) elifStmt)*
   [skipInsideQuot(colEq) elseBlock]
 
@@ -476,7 +477,7 @@ attribute [pyCompoundStmt_parser] ifStmt
 /-! ### While Statement -/
 
 syntax whileStmt := withPosition $
-  "while" namedExpr ":" block
+  "while" namedExpr ":" pyBlock
   [skipInsideQuot(colEq) elseBlock]
 
 attribute [pyCompoundStmt_parser] whileStmt
@@ -485,7 +486,7 @@ attribute [pyCompoundStmt_parser] whileStmt
 
 syntax forStmt := withPosition $
   atomic("async "? "for" starTargets "in")
-  starExprs ":" [typeComment] block
+  starExprs ":" [typeComment] pyBlock
   [skipInsideQuot(colEq) elseBlock]
 
 attribute [pyCompoundStmt_parser] forStmt
@@ -496,8 +497,8 @@ syntax withItem :=
   pyExpr ["as" pyStarTarget lookahead("," <|> ")" <|> ":")]
 
 syntax withSig
-  | "(" withItem,+,? ")" ":" block
-  | withItem,+ ":" [typeComment] block
+  | "(" withItem,+,? ")" ":" pyBlock
+  | withItem,+ ":" [typeComment] pyBlock
 
 syntax withStmt := withPosition $
   "async "? "with " withSig
@@ -507,16 +508,16 @@ attribute [pyCompoundStmt_parser] withStmt
 /-! ### Try Statement -/
 
 syntax exceptBlock :=
-  "except" (":" <|> (pyExpr ["as" name] ":")) block
+  "except" (":" <|> (pyExpr ["as" name] ":")) pyBlock
 
 syntax exceptStarBlock :=
-  atomic("except" "*") pyExpr ["as" name] ":" block
+  atomic("except" "*") pyExpr ["as" name] ":" pyBlock
 
 syntax finallyBlock :=
-  "finally" ":" block
+  "finally" ":" pyBlock
 
 syntax tryStmt := withPosition $
-  "try" ":" block colEq (exceptStarBlock+ <|> exceptBlock+)
+  "try" ":" pyBlock colEq (exceptStarBlock+ <|> exceptBlock+)
     [colEq elseBlock] [colEq finallyBlock]
 
 attribute [pyCompoundStmt_parser] tryStmt
@@ -586,7 +587,7 @@ syntax patterns
 syntax guard := " if " namedExpr
 
 syntax caseBlock := withPosition $
-  "case " patterns [guard] ":" block
+  "case " patterns [guard] ":" pyBlock
 
 syntax subjectExpr
   | "*" pyExpr:55 "," starNamedExpr,*,?

@@ -57,7 +57,7 @@ def runPy (stx : Syntax) : PyElabM Unit :=
 
 open Grammar
 
-scoped syntax (name := evalPyCmd) withPosition("#eval_py" Grammar.block) : command
+scoped syntax (name := evalPyCmd) withPosition("#eval_py" pyBlock) : command
 
 def mkPyContext : BaseIO PyContext := do
   let globals ← -- TODO: proper built-ins

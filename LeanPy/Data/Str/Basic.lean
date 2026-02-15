@@ -15,39 +15,35 @@ namespace LeanPy
 /-- Returns the Python string representation of a `String`. -/
 def strRepr (s : String) : String :=
   let q := if s.contains '\'' && !s.contains '"' then '"' else '\''
-  go s q 0 ("".push q) |>.push q
+  go q s.startPos ("".push q) |>.push q
 where
-  go s q p ns : String :=
-    if h : s.atEnd p then
+  go q p ns : String :=
+    if h : p.IsAtEnd then
       ns
     else
-      let c := s.get' p h
-      let p' := s.next' p h
+      let c := p.get h
+      let p' := p.next h
       if c == q then
-        go s q p' (ns.push '\\' |>.push q)
+        go q p' (ns.push '\\' |>.push q)
       else if c == '\\' then
-        go s q p' (ns.push '\\' |>.push '\\')
+        go q p' (ns.push '\\' |>.push '\\')
       else if c == '\t' then
-        go s q p' (ns.push '\\' |>.push 't')
+        go q p' (ns.push '\\' |>.push 't')
       else if c == '\r' then
-        go s q p' (ns.push '\\' |>.push 'r')
+        go q p' (ns.push '\\' |>.push 'r')
       else if c == '\n' then
-        go s q p' (ns.push '\\' |>.push 'n')
+        go q p' (ns.push '\\' |>.push 'n')
       else if c.val < 0x20 || c.val == 0x7f then
-        go s q p' (upperHexUInt8 c.val.toUInt8 (ns.push '\\' |>.push 'x'))
+        go q p' (upperHexUInt8 c.val.toUInt8 (ns.push '\\' |>.push 'x'))
       else if c.val < 0x7f || isPrintableUnicode c then
-        go s q p' (ns.push c)
+        go q p' (ns.push c)
       else if c.val < 0x100 then
-        go s q p' (upperHexUInt8 c.val.toUInt8 (ns.push '\\' |>.push 'x'))
+        go q p' (upperHexUInt8 c.val.toUInt8 (ns.push '\\' |>.push 'x'))
       else if c.val < 0x10000 then
-        go s q p' (upperHexUInt16 c.val.toUInt16 (ns.push '\\' |>.push 'u'))
+        go q p' (upperHexUInt16 c.val.toUInt16 (ns.push '\\' |>.push 'u'))
       else
-        go s q p' (upperHexUInt32 c.val (ns.push '\\' |>.push 'U'))
-  termination_by s.utf8ByteSize - p.byteIdx
-  decreasing_by all_goals
-    apply Nat.sub_lt_sub_left
-    · simpa [String.atEnd] using h
-    · exact String.lt_next' ..
+        go q p' (upperHexUInt32 c.val (ns.push '\\' |>.push 'U'))
+  termination_by p
   @[inline] isPrintableUnicode c :=
     -- TODO: Use unicode definition once Lean has support for it
     Lean.isLetterLike c

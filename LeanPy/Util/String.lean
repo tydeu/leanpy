@@ -21,7 +21,7 @@ def upperHexChar (n : UInt8) : Char :=
 
 -- sanity check
 #guard "0123456789ABCDEF" =
-  (String.mk <| (0...(16 : UInt8)).toList.map upperHexChar)
+  (String.ofList <| (0...(16 : UInt8)).toList.map upperHexChar)
 
 def upperHexUInt8 (n : UInt8) (init := "") : String :=
   init

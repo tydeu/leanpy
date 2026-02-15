@@ -1,4 +1,4 @@
-(LeanPy.Grammar.block
+(LeanPy.Grammar.pyBlock
  [(LeanPy.Grammar.stmt
    (LeanPy.Grammar.simpleStmts
     [(LeanPy.Grammar.assignment
@@ -33,7 +33,7 @@
     (LeanPy.Grammar.namedExpr
      (group (LeanPy.Grammar.isExpr (LeanPy.Grammar.identExpr `a) "is" (LeanPy.Grammar.noneExpr "None"))))
     ":"
-    (LeanPy.Grammar.block
+    (LeanPy.Grammar.pyBlock
      [(LeanPy.Grammar.stmt
        (LeanPy.Grammar.simpleStmts
         [(LeanPy.Grammar.starExprs
@@ -51,7 +51,7 @@
     [(LeanPy.Grammar.elseBlock
       "else"
       ":"
-      (LeanPy.Grammar.block
+      (LeanPy.Grammar.pyBlock
        [(LeanPy.Grammar.stmt
          (LeanPy.Grammar.simpleStmts
           [(LeanPy.Grammar.returnStmt
