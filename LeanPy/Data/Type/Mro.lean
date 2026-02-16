@@ -8,50 +8,75 @@ import LeanPy.Data.Type.Ref
 namespace LeanPy
 
 /-- The type's method resolution order (excluding itself). -/
-@[inline] def RawTypeRef.baseMro (self : RawTypeRef) : List TypeRef :=
-  go self.data
-where go self :=
+@[inline] def PyType.baseMro (self : PyType) : List RawTypeRef :=
   match self with
   | {base? := none, ..} => []
-  | {base? := some base, ..} => ⟨base⟩ :: go base.data
+  | {base? := some base, ..} => base :: baseMro base.data
 termination_by structural self
 
--- manual equational lemma due to lean4#12495
--- https://github.com/leanprover/lean4/issues/12495
-private theorem RawTypeRef.baseMro.go_some :
-  go {
-    name, doc?, base? := some base,
-    isBaseType, isBuiltin, isTypeSubclass, isStrSubclass, isIntSubclass,
-    isTupleSubclass, isDictSubclass, IsValidObject
-  } = ⟨base⟩ :: go base.data := rfl
+/-- The type's method resolution order (excluding itself). -/
+abbrev RawTypeRef.baseMro (self : RawTypeRef) : List RawTypeRef :=
+  self.data.baseMro
+
+@[simp] theorem RawTypeRef.baseMro_eq_data_baseMro :
+  baseMro self = self.data.baseMro
+:= by rfl
+
+/-- The type's method resolution order. -/
+@[inline] def RawTypeRef.mro (self : RawTypeRef) : List RawTypeRef :=
+  self :: self.data.baseMro
+
+theorem RawTypeRef.mro_eq_cons :
+  mro self = self :: self.baseMro := rfl
+
+theorem PyType.baseMro_eq_elim :
+  baseMro self = self.base?.elim [] RawTypeRef.mro
+:= by
+  match self with
+  | {base? := none, ..} => rfl
+  | {base? := some base, ..} => rfl
 
 /-- The type's method resolution order (excluding itself). -/
-@[inline] def PyType.baseMro (self : PyType) : List TypeRef :=
-  self.base?.elim [] fun base => ⟨base⟩ :: RawTypeRef.baseMro base
+@[inline] private def PyType.baseMro' (self : PyType) : List TypeRef :=
+  match self with
+  | {base? := none, ..} => []
+  | {base? := some base, ..} => ⟨base⟩ :: baseMro' base.data
+termination_by structural self
+
+/-- The type's method resolution order (excluding itself). -/
+private abbrev RawTypeRef.baseMro' (self : RawTypeRef) : List TypeRef :=
+  self.data.baseMro'
+
+@[simp] private theorem RawTypeRef.baseMro'_eq_data_baseMro :
+  baseMro' self = self.data.baseMro' := rfl
+
+/-- The type's method resolution order. -/
+@[inline] private def RawTypeRef.mro' (self : RawTypeRef) : List TypeRef :=
+  ⟨self⟩ :: self.baseMro'
+
+private theorem PyType.baseMro'_eq_elim :
+  baseMro' self = self.base?.elim [] RawTypeRef.mro'
+:= by
+  match self with
+  | {base? := none, ..} => rfl
+  | {base? := some base, ..} => rfl
 
 namespace TypeRef
 
-/-- The type's method resolution order. -/
-@[inline] def mro (self : TypeRef) : List TypeRef :=
-  self :: self.toRawTypeRef.baseMro
-
 /-- The type's method resolution order (excluding itself). -/
 @[inline] def baseMro (self : TypeRef) : List TypeRef :=
-  self.base?.elim [] mro
+  self.data.baseMro'
 
-theorem baseMro_eq_elim : baseMro self = self.base?.elim [] mro := rfl
+/-- The type's method resolution order. -/
+@[inline] def mro (self : TypeRef) : List TypeRef :=
+  self :: self.baseMro
 
-theorem baseMro_eq_data_baseMro : baseMro self = self.data.baseMro := by
-  simp only [baseMro_eq_elim, PyType.baseMro, base?]
-  cases self.data.base? <;> simp only [Option.elim, Option.map, mro]
+theorem baseMro_eq_elim : baseMro self = self.base?.elim [] mro := by
+  simp only [baseMro, PyType.baseMro'_eq_elim, base?]
+  unfold mro RawTypeRef.mro' baseMro RawTypeRef.baseMro'
+  cases self.data.base? <;> simp
 
-theorem mro_eq_cons_baseMro : mro self = self :: baseMro self := by
-  unfold mro RawTypeRef.baseMro -- RawTypRef.baseMro.go -- lean4#12495
-  simp only [baseMro_eq_elim, Option.elim, Option.map, base?, data]
-  match self.toRawTypeRef.data with
-  | {base? := none, ..} => rfl
-  | {base? := some base, ..} =>
-    simp only [mro, RawTypeRef.baseMro, RawTypeRef.baseMro.go_some]
+theorem mro_eq_cons : mro self = self :: baseMro self := by rfl
 
 instance : SizeOf TypeRef := ⟨(·.baseMro.length)⟩
 
@@ -60,16 +85,31 @@ instance : SizeOf TypeRef := ⟨(·.baseMro.length)⟩
 := rfl
 
 @[simp] theorem length_mro : (mro self).length = self.baseMro.length + 1 := by
-  simp [mro_eq_cons_baseMro]
+  simp [mro_eq_cons]
 
 theorem mem_mro_iff : ty ∈ mro self ↔ ty = self ∨ ty ∈ baseMro self := by
-  simp [mro_eq_cons_baseMro]
+  simp [mro_eq_cons]
 
 @[simp] theorem self_mem_mro : self ∈ mro self := by
-  simp [mro_eq_cons_baseMro]
+  simp [mro_eq_cons]
 
 @[simp] theorem baseMro_subset_mro : baseMro self ⊆ mro self := by
-  simp [mro_eq_cons_baseMro]
+  simp [mro_eq_cons]
+
+theorem mem_baseMro_iff_mem_data_baseMro :
+  ty ∈ baseMro self ↔ ty.toRawTypeRef ∈ self.data.baseMro
+:= by
+  simp only [baseMro_eq_elim, PyType.baseMro_eq_elim, base?]
+  match h:self.data.base? with
+  | none => simp
+  | some base =>
+    have baseMro_self : baseMro self = mro ⟨base⟩ := by
+       simp [baseMro_eq_elim, base?, h]
+    let ⟨raw⟩ := ty
+    let ih := mem_baseMro_iff_mem_data_baseMro (ty := ⟨raw⟩) (self := ⟨base⟩)
+    simp [mro_eq_cons, RawTypeRef.mro_eq_cons, ih]
+termination_by self
+decreasing_by simp [baseMro_self]
 
 private theorem sup_mem_baseMro_sub :
   sup ∈ baseMro sub → ∀ {ty}, ty ∈ baseMro sup → ty ∈ baseMro sub

@@ -16,11 +16,15 @@ namespace TypeRef
 
 instance : Coe TypeRef RawTypeRef := ⟨TypeRef.toRawTypeRef⟩
 
-@[inline] def addr (self : TypeRef) : Addr :=
+abbrev addr (self : TypeRef) : Addr :=
   self.toRawTypeRef.addr
 
-@[inline] def data (self : TypeRef) : PyType :=
+@[simp] theorem addr_eq : addr self = self.toRawTypeRef.addr := rfl
+
+abbrev data (self : TypeRef) : PyType :=
   self.toRawTypeRef.data
+
+@[simp] theorem data_eq : data self = self.toRawTypeRef.data := rfl
 
 theorem eq_iff : a = b ↔ addr a = addr b ∧ data a = data b := by
   cases a; cases b; simp [addr, data, FrozenRef.eq_iff]

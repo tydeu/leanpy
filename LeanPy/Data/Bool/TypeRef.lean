@@ -18,7 +18,7 @@ def boolType.doc : String := "\
 @[reducible] def boolType : PyType where
   name := "bool"
   doc? := some boolType.doc
-  base? := some intTypeRef
+  base? := some intTypeRawRef
   isIntSubclass := true
   IsValidObject id data :=
     (id = .false ∨ id = .true) ∧
@@ -27,6 +27,16 @@ def boolType.doc : String := "\
     -- redundant, but makes `simp_all` work in `LawfulType`
     data.isOfType IntRef
 
-initialize boolTypeRef.init : InitTypeRef boolType ← initTypeRef
+@[simp] theorem baseMro_boolType :
+  boolType.baseMro = [intTypeRawRef, objectTypeRawRef]
+:= rfl
 
-abbrev boolTypeRef : TypeRef := boolTypeRef.init.toTypeRef
+private initialize boolTypeInitRef : InitTypeRef boolType ← initTypeRef
+
+@[inline] def boolTypeRawRef : RawTypeRef := boolTypeInitRef.toRawTypeRef
+
+@[simp] theorem isNonScalar_addr_boolTypeRawRef : boolTypeRawRef.addr.isNonScalar :=
+  boolTypeInitRef.isNonScalar_addr
+
+@[simp] theorem data_boolTypeRawRef : boolTypeRawRef.data = boolType :=
+  boolTypeInitRef.data_toRawTypeRef

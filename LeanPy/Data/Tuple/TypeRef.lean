@@ -21,10 +21,20 @@ def tupleDataKind : DataKind := `LeanPy.TupleRef
 @[reducible] def tupleType : PyType where
   name := "tuple"
   doc? := some tupleType.doc
-  base? := some objectTypeRef
+  base? := some objectTypeRawRef
   isTupleSubclass := true
   IsValidObject id data := id.isNonScalar ∧ data.kind = tupleDataKind
 
-initialize tupleTypeRef.init : InitTypeRef tupleType ← initTypeRef
+@[simp] theorem baseMro_tupleType :
+  tupleType.baseMro = [objectTypeRawRef]
+:= rfl
 
-abbrev tupleTypeRef : TypeRef := tupleTypeRef.init.toTypeRef
+private initialize tupleTypeInitRef : InitTypeRef tupleType ← initTypeRef
+
+@[inline] def tupleTypeRawRef : RawTypeRef := tupleTypeInitRef.toRawTypeRef
+
+@[simp] theorem isNonScalar_addr_tupleTypeRawRef : tupleTypeRawRef.addr.isNonScalar :=
+  tupleTypeInitRef.isNonScalar_addr
+
+@[simp] theorem data_tupleTypeRawRef : tupleTypeRawRef.data = tupleType :=
+  tupleTypeInitRef.data_toRawTypeRef

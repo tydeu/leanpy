@@ -28,9 +28,19 @@ def intType.doc : String := "\
   name := "int"
   doc? := some intType.doc
   isIntSubclass := true
-  base? := some objectTypeRef
+  base? := some objectTypeRawRef
   IsValidObject _ data := data.isOfType IntRef -- TODO: id.isInt
 
-initialize intTypeRef.init : InitTypeRef intType ← initTypeRef
+private initialize intTypeInitRef : InitTypeRef intType ← initTypeRef
 
-abbrev intTypeRef : TypeRef := intTypeRef.init.toTypeRef
+@[simp] theorem baseMro_intType :
+  intType.baseMro = [objectTypeRawRef]
+:= rfl
+
+@[inline] def intTypeRawRef : RawTypeRef := intTypeInitRef.toRawTypeRef
+
+@[simp] theorem isNonScalar_addr_intTypeRawRef : intTypeRawRef.addr.isNonScalar :=
+  intTypeInitRef.isNonScalar_addr
+
+@[simp] theorem data_intTypeRawRef : intTypeRawRef.data = intType :=
+  intTypeInitRef.data_toRawTypeRef

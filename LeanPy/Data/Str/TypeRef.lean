@@ -25,9 +25,19 @@ def strType.doc : String := "\
   name := "str"
   doc? := some strType.doc
   isStrSubclass := true
-  base? := some objectTypeRef
+  base? := some objectTypeRawRef
   IsValidObject id data := id.isNonScalar ∧ data.isOfType StrRef
 
-initialize strTypeRef.init : InitTypeRef strType ← initTypeRef
+@[simp] theorem baseMro_strType :
+  strType.baseMro = [objectTypeRawRef]
+:= rfl
 
-abbrev strTypeRef : TypeRef := strTypeRef.init.toTypeRef
+private initialize strTypeInitRef : InitTypeRef strType ← initTypeRef
+
+@[inline] def strTypeRawRef : RawTypeRef := strTypeInitRef.toRawTypeRef
+
+@[simp] theorem isNonScalar_addr_strTypeRawRef : strTypeRawRef.addr.isNonScalar :=
+  strTypeInitRef.isNonScalar_addr
+
+@[simp] theorem data_strTypeRawRef : strTypeRawRef.data = strType :=
+  strTypeInitRef.data_toRawTypeRef

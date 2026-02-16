@@ -23,8 +23,22 @@ attribute [simp] InitTypeRef.data_eq
 
 instance : Nonempty (InitTypeRef ty) := ⟨⟨.null ty, rfl⟩⟩
 
+@[inline] def toRawTypeRef (self : InitTypeRef ty) : RawTypeRef :=
+  self.toFrozenRef.cast self.data_eq
+
+@[simp] theorem data_toRawTypeRef {self : InitTypeRef ty} :
+  self.toRawTypeRef.data = ty
+:= by simp [toRawTypeRef]
+
+@[simp] theorem isNonScalar_addr_toRawTypeRef {self : InitTypeRef ty} :
+  self.toRawTypeRef.addr.isNonScalar
+:= self.isNonScalar_addr
+
+instance : CoeOut (InitTypeRef ty) RawTypeRef :=
+  ⟨InitTypeRef.toRawTypeRef⟩
+
 @[inline] def toTypeRef (self : InitTypeRef ty) : TypeRef :=
-  ⟨self.toFrozenRef.cast self.data_eq⟩
+  ⟨self.toRawTypeRef⟩
 
 @[simp] theorem data_toTypeRef {self : InitTypeRef ty} :
   self.toTypeRef.data = ty

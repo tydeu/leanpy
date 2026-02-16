@@ -9,10 +9,20 @@ namespace LeanPy
 
 @[reducible] def noneType : PyType where
   name := "NoneType"
-  base? := some objectTypeRef
+  base? := some objectTypeRawRef
   IsValidObject id data :=
     id = .none ∧ data = .mk ()
 
-initialize noneTypeRef.init : InitTypeRef noneType ← initTypeRef
+@[simp] theorem baseMro_noneType :
+  noneType.baseMro = [objectTypeRawRef]
+:= rfl
 
-abbrev noneTypeRef : TypeRef := noneTypeRef.init.toTypeRef
+private initialize noneTypeInitRef : InitTypeRef noneType ← initTypeRef
+
+@[inline] def noneTypeRawRef : RawTypeRef := noneTypeInitRef.toRawTypeRef
+
+@[simp] theorem isNonScalar_addr_noneTypeRawRef : noneTypeRawRef.addr.isNonScalar :=
+  noneTypeInitRef.isNonScalar_addr
+
+@[simp] theorem data_noneTypeRawRef : noneTypeRawRef.data = noneType :=
+  noneTypeInitRef.data_toRawTypeRef

@@ -16,11 +16,21 @@ def typeType.doc : String := "\
   name := "type"
   doc? := some typeType.doc
   isTypeSubclass := true
-  base? := some objectTypeRef
+  base? := some objectTypeRawRef
   -- NOTE: Validity of the data of the object
   -- is shown through `Object.lawful_ty_data`
   IsValidObject id _ := id.isNonScalar
 
-initialize typeTypeRef.init : InitTypeRef typeType ← initTypeRef
+@[simp] theorem baseMro_typeType :
+  typeType.baseMro = [objectTypeRawRef]
+:= rfl
 
-abbrev typeTypeRef : TypeRef := typeTypeRef.init.toTypeRef
+private initialize typeTypeInitRef : InitTypeRef typeType ← initTypeRef
+
+@[inline] def typeTypeRawRef : RawTypeRef := typeTypeInitRef.toRawTypeRef
+
+@[simp] theorem isNonScalar_addr_typeTypeRawRef : typeTypeRawRef.addr.isNonScalar :=
+  typeTypeInitRef.isNonScalar_addr
+
+@[simp] theorem data_typeTypeRawRef : typeTypeRawRef.data = typeType :=
+  typeTypeInitRef.data_toRawTypeRef

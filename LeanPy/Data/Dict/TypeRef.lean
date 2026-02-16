@@ -24,10 +24,20 @@ def dictDataKind : DataKind := `LeanPy.Dict
 @[reducible] def dictType : PyType where
   name := "dict"
   doc? := some dictType.doc
-  base? := some objectTypeRef
+  base? := some objectTypeRawRef
   isDictSubclass := true
   IsValidObject id data := id.isNonScalar ∧ data.kind = dictDataKind
 
-initialize dictTypeRef.init : InitTypeRef dictType ← initTypeRef
+@[simp] theorem baseMro_dictType :
+  dictType.baseMro = [objectTypeRawRef]
+:= rfl
 
-abbrev dictTypeRef : TypeRef := dictTypeRef.init.toTypeRef
+private initialize dictTypeInitRef : InitTypeRef dictType ← initTypeRef
+
+@[inline] def dictTypeRawRef : RawTypeRef := dictTypeInitRef.toRawTypeRef
+
+@[simp] theorem isNonScalar_addr_dictTypeRawRef : dictTypeRawRef.addr.isNonScalar :=
+  dictTypeInitRef.isNonScalar_addr
+
+@[simp] theorem data_dictTypeRawRef : dictTypeRawRef.data = dictType :=
+  dictTypeInitRef.data_toRawTypeRef
